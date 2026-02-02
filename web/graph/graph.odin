@@ -1,13 +1,21 @@
 package graph
 
 import "core:fmt"
+import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
 
 Node :: struct {
     using position : [2]f32,
     previous : union{int},
-    on_path : bool
+    on_path : bool,
+    faces_calculated : bool
+}
+
+Edge :: [2]int
+
+Face :: struct {
+    edges : [dynamic]int
 }
 
 Graph :: struct {
@@ -15,7 +23,8 @@ Graph :: struct {
     edges : [dynamic][2]int,
     width : f32,
     height : f32,
-    path : [dynamic]int
+    path : [dynamic]int,
+    faces : [dynamic]Face
 }
 
 distance_sq :: proc(a, b : [2]f32) -> f32
@@ -60,6 +69,102 @@ random_choice :: proc(values : []$T) -> (T, int)
     }
 
     return values[choice], choice
+}
+
+atan3 :: proc(x, y, theta0 : f32) -> f32
+{
+    theta := math.atan2(y, x)
+    if theta < 0 do theta += 2*math.PI
+    if theta < theta0
+    {
+        theta = theta + 2*math.PI
+    }
+    return theta - theta0
+}
+
+deg :: proc(rad : f32) -> int
+{
+    return int(rad * 180/math.PI)
+}
+
+circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) -> (next_node_index : int, next_edge_index : int)
+{
+    last_edge := graph.edges[last_edge_index]
+    previous_node_index := last_edge[0] if last_edge[1] == current_node_index else last_edge[1]
+    
+    current_node := graph.nodes[current_node_index]
+    previous_node := graph.nodes[previous_node_index]
+
+    vector := previous_node.position - current_node.position
+    theta0 := math.atan2(vector[1], vector[0])
+    if theta0 < 0 do theta0 += 2*math.PI
+
+    next_node_index = previous_node_index
+    next_edge_index = last_edge_index
+    best_angle : f32 = math.inf_f32(1)
+
+    // fmt.println("   base", deg(theta0))
+
+    iterator := Neighbors{ graph=graph, source=current_node_index }
+    for neighbor_index, edge_index in neighbors(&iterator)
+    {
+        if edge_index == last_edge_index do continue
+        
+        neighbor := graph.nodes[neighbor_index]
+        vector := neighbor.position - current_node.position
+        angle := atan3(vector[0], vector[1], theta0)
+        
+        // fmt.println("  ", neighbor_index, deg(angle))
+
+        if angle < best_angle
+        {
+            best_angle = angle
+            next_node_index = neighbor_index
+            next_edge_index = edge_index
+        }
+    }
+
+    return
+}
+
+find_faces :: proc(graph : ^Graph)
+{
+    for node, node_index in graph.nodes
+    {
+        // fmt.println("from", node_index)
+
+        iterator := Neighbors{ graph=graph^, source=node_index }
+        for neighbor, edge_index in neighbors(&iterator)
+        {
+            face := Face{}
+            append(&face.edges, edge_index)
+
+            is_face_valid := true
+
+            current_node := neighbor
+            last_edge := edge_index
+            for current_node != node_index
+            {
+                // fmt.println(" go", current_node, last_edge)
+
+                if graph.nodes[current_node].faces_calculated
+                {
+                    // we've already computed this face
+                    delete(face.edges)
+                    is_face_valid = false
+                    break
+                }
+
+                current_node, last_edge = circular_walk(graph^, current_node, last_edge)                
+
+                append(&face.edges, last_edge)
+            }
+
+            if is_face_valid do append(&graph.faces, face)
+        }
+
+        graph.nodes[node_index].faces_calculated = true
+    }
 }
 
 mutate_path :: proc(graph : ^Graph) -> bool
@@ -162,7 +267,7 @@ find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
         clear(next_frontier)
     }
 
-    fmt.println()
+    // fmt.println()
 
     current := end
     for graph.nodes[current].previous != nil
@@ -285,33 +390,51 @@ generate_graph :: proc(graph : ^Graph)
     {
         failed = !mutate_path(graph)
     }
+
+    find_faces(graph)
 }
 
 main :: proc()
 {
-    g : Graph
+    // theta0 : f32 = 1*math.PI / 6
 
-    nodes := []Node{
-        Node{},
-        Node{},
-        Node{},
-        Node{},
-    }    
+    // for k in 0..<12
+    // {
+    //     theta := f32(k) * (2*math.PI / 12)
+    //     x := math.cos(theta)
+    //     y := math.sin(theta)
+    //     base_angle := int(math.atan2(y, x) * (180 / math.PI))
+    //     angle := int(atan3(x, y, theta0) * (180 / math.PI))
+    //     fmt.println(k, angle)
+    // }
 
-    edges := [][2]int{
-        { 0, 1 },
-        { 1, 2 },
-        { 2, 3 },
-        { 3, 0 },
-        { 0, 2 },
-    }
+    graph : Graph
 
-    for n in nodes { append(&g.nodes, n) }
-    for e in edges { append(&g.edges, e) }
+    append(&graph.nodes, Node{ position={0, 0} })
+    append(&graph.nodes, Node{ position={0, 1} })
+    append(&graph.nodes, Node{ position={1, 1} })
+    append(&graph.nodes, Node{ position={1, 0} })
+    
+    append(&graph.edges, [2]int{0, 1})
+    append(&graph.edges, [2]int{1, 2})
+    append(&graph.edges, [2]int{2, 3})
+    append(&graph.edges, [2]int{3, 0})
+    append(&graph.edges, [2]int{2, 0})
 
-    it := Neighbors{ graph=g, source=0 }
-    for x, y in neighbors(&it)
+    // n, e := circular_walk(graph, 2, 4)
+    // fmt.println(n, e)
+
+    // next_node_index, next_edge_index := 1, 0
+    // for next_node_index != 0
+    // {
+    //     fmt.println(next_node_index, next_edge_index)
+    //     next_node_index, next_edge_index = circular_walk(graph, next_node_index, next_edge_index)
+    // }
+
+    find_faces(&graph)
+
+    for face in graph.faces
     {
-        fmt.println(x, y)
+        fmt.println(face)
     }
 }

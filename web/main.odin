@@ -35,6 +35,12 @@ main :: proc()
 
     for !rl.WindowShouldClose()
     {
+        show_path := false
+        if rl.IsKeyDown(rl.KeyboardKey.R)
+        {
+            show_path = true
+        }
+
         rl.BeginDrawing()
 
         rl.ClearBackground(rl.BLACK)
@@ -71,7 +77,7 @@ main :: proc()
             // rl.DrawText(label, p.x + 10, p.y + 10, 15, rl.WHITE)
         }
 
-        for edge_index in g.path
+        if show_path do for edge_index in g.path
         {
             edge := g.edges[edge_index]
             a := g.nodes[edge[0]]
@@ -83,6 +89,32 @@ main :: proc()
                 b_screen.x, b_screen.y,
                 rl.RED
             )
+        }
+
+        for face in g.faces
+        {
+            total : [2]f32
+            bad_count := 0
+            for edge_index in face.edges
+            {
+                edge := g.edges[edge_index]
+                a := g.nodes[edge[0]].position
+                b := g.nodes[edge[1]].position
+                total += a + b
+
+                if graph.contains(g.path[:], edge_index)
+                {
+                    bad_count += 1
+                }
+            }
+            total /= f32(2 * len(face.edges))
+
+            p := node_to_pixel(g, window, total)
+
+            label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", bad_count))
+            defer delete(label)
+            size := rl.MeasureText(label, 25)
+            rl.DrawText(label, p.x - size / 2, p.y - 12, 25, rl.WHITE)
         }
 
         rl.EndDrawing()
