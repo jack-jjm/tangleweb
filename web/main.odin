@@ -20,6 +20,30 @@ node_to_pixel :: proc(graph : graph.Graph, window : ScreenArea, node : [2]f32) -
     return { x, y }
 }
 
+pixel_to_node :: proc(graph : graph.Graph, window : ScreenArea, point : [2]f32) -> [2]f32
+{
+    relative := point - [2]f32{ f32(window.x), f32(window.y) }
+    x := f32(relative.x) * (graph.width / f32(window.width))
+    y := f32(relative.y) * (graph.height / f32(window.height))
+    return { x, y }
+}
+
+Node :: struct
+{
+    using position : [2]i32,
+    active : bool
+}
+
+create_node_sprite :: proc(g : graph.Graph, window : ScreenArea, node : graph.Node) -> Node
+{
+    p := node_to_pixel(g, window, node)
+    return {
+        x = p.x,
+        y = p.y,
+        active = false
+    }
+}
+
 main :: proc()
 {
     rand.reset(1)
@@ -33,12 +57,57 @@ main :: proc()
 
     graph.generate_graph(&g)
 
+    current_node := 0
+    dead := false
+
+    node_sprites := make([dynamic]Node)
+    for node in g.nodes do append(&node_sprites, create_node_sprite(g, window, node))
+
     for !rl.WindowShouldClose()
     {
         show_path := false
-        if rl.IsKeyDown(rl.KeyboardKey.R)
+        if rl.IsKeyDown(rl.KeyboardKey.C)
         {
             show_path = true
+        }
+
+        mouse := pixel_to_node(g, window, rl.GetMousePosition())
+
+        for &sprite in node_sprites do sprite.active = false
+
+        if !dead
+        {
+            hit := graph.hit(g, mouse.x, mouse.y)
+            if hit != nil
+            {
+                hit := hit.(int)
+
+                node_sprites[hit].active = true
+                
+                yes, edge_id := graph.adjacent(g, hit, current_node)
+                if yes && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
+                {
+                    if graph.contains(g.path[:], edge_id)
+                    {
+                        fmt.println("dead")
+                        dead = true
+                    }
+                    else
+                    {
+                        graph.declare_safe(g, edge_id)
+                    }
+
+                    current_node = hit
+                }
+            }
+        }
+        else
+        {
+            if rl.IsKeyReleased(rl.KeyboardKey.R)
+            {
+                dead = false
+                current_node = 0
+            }
         }
 
         rl.BeginDrawing()
@@ -47,14 +116,23 @@ main :: proc()
 
         for edge, edge_index in g.edges
         {
-            a := g.nodes[edge[0]]
-            b := g.nodes[edge[1]]
+            a := g.nodes[edge.endpoints[0]]
+            b := g.nodes[edge.endpoints[1]]
             a_screen := node_to_pixel(g, window, a)
             b_screen := node_to_pixel(g, window, b)
+            
+            color : rl.Color
+            switch edge.safety
+            {
+                case .UNKNOWN: color = rl.WHITE
+                case .SAFE: color = rl.GREEN
+                case .UNSAFE: color = rl.RED
+            }
+            
             rl.DrawLine(
                 a_screen.x, a_screen.y,
                 b_screen.x, b_screen.y,
-                rl.WHITE
+                color
             )
 
             when ODIN_DEBUG
@@ -66,10 +144,9 @@ main :: proc()
             }
         }
 
-        for node, index in g.nodes
+        for p, index in node_sprites
         {
-            p := node_to_pixel(g, window, node)
-            rl.DrawRectangle(
+            if p.active do rl.DrawRectangle(
                 p.x - 5, p.y - 5,
                 10, 10,
                 rl.WHITE
@@ -83,9 +160,18 @@ main :: proc()
             }
         }
 
+        if !dead
+        {
+            p := g.nodes[current_node]
+            screen := node_to_pixel(g, window, p)
+            rl.DrawCircle(
+                screen.x, screen.y, 10, rl.YELLOW
+            )
+        }
+
         if show_path do for edge_index in g.path
         {
-            edge := g.edges[edge_index]
+            edge := g.edges[edge_index].endpoints
             a := g.nodes[edge[0]]
             b := g.nodes[edge[1]]
             a_screen := node_to_pixel(g, window, a)
@@ -100,27 +186,26 @@ main :: proc()
         for face in g.faces
         {
             total : [2]f32
-            bad_count := 0
             for edge_index in face.edges
             {
-                edge := g.edges[edge_index]
+                edge := g.edges[edge_index].endpoints
                 a := g.nodes[edge[0]].position
                 b := g.nodes[edge[1]].position
                 total += a + b
-
-                if graph.contains(g.path[:], edge_index)
-                {
-                    bad_count += 1
-                }
             }
             total /= f32(2 * len(face.edges))
 
             p := node_to_pixel(g, window, total)
 
-            label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", bad_count))
+            label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", face.count))
             defer delete(label)
             size := rl.MeasureText(label, 25)
             rl.DrawText(label, p.x - size / 2, p.y - 12, 25, rl.WHITE)
+        }
+
+        if dead
+        {
+            rl.DrawText("DEAD", 110, 160, 400, rl.WHITE)
         }
 
         rl.EndDrawing()

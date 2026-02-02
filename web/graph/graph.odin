@@ -5,6 +5,8 @@ import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
 
+Safety :: enum { UNKNOWN, SAFE, UNSAFE }
+
 Node :: struct {
     using position : [2]f32,
     previous : union{int},
@@ -12,15 +14,19 @@ Node :: struct {
     faces_calculated : bool
 }
 
-Edge :: [2]int
+Edge :: struct {
+    using endpoints : [2]int,
+    safety : Safety
+}
 
 Face :: struct {
-    edges : [dynamic]int
+    edges : [dynamic]int,
+    count : int
 }
 
 Graph :: struct {
     nodes : [dynamic]Node,
-    edges : [dynamic][2]int,
+    edges : [dynamic]Edge,
     width : f32,
     height : f32,
     path : [dynamic]int,
@@ -89,7 +95,7 @@ deg :: proc(rad : f32) -> int
 
 circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) -> (next_node_index : int, next_edge_index : int)
 {
-    last_edge := graph.edges[last_edge_index]
+    last_edge := graph.edges[last_edge_index].endpoints
     previous_node_index := last_edge[0] if last_edge[1] == current_node_index else last_edge[1]
     
     current_node := graph.nodes[current_node_index]
@@ -138,6 +144,10 @@ find_faces :: proc(graph : ^Graph)
         {
             face := Face{}
             append(&face.edges, edge_index)
+            if contains(graph.path[:], edge_index)
+            {
+                face.count += 1
+            }
 
             is_face_valid := true
 
@@ -158,6 +168,10 @@ find_faces :: proc(graph : ^Graph)
                 current_node, last_edge = circular_walk(graph^, current_node, last_edge)                
 
                 append(&face.edges, last_edge)
+                if contains(graph.path[:], last_edge)
+                {
+                    face.count += 1
+                }
             }
 
             if is_face_valid do append(&graph.faces, face)
@@ -176,7 +190,7 @@ mutate_path :: proc(graph : ^Graph) -> bool
     {
         // pick a random edge on the path
         edge_index, path_index = random_choice(graph.path[:])
-        edge := graph.edges[edge_index]
+        edge := graph.edges[edge_index].endpoints
         
         new_segment = find_path(graph^, edge[0], edge[1])
 
@@ -214,7 +228,7 @@ neighbors :: proc(iterator : ^Neighbors) -> (neighbor : int, edge_index : int, c
 
     for index < len(graph.edges)
     {
-        edge := graph.edges[index]
+        edge := graph.edges[index].endpoints
         edge_index = index
 
         iterator.index += 1
@@ -284,7 +298,7 @@ find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
         graph.nodes[current].on_path = true
         edge_index := graph.nodes[current].previous.(int)
         append(&path, edge_index)
-        edge := graph.edges[edge_index]
+        edge := graph.edges[edge_index].endpoints
         current = edge[0] if edge[1] == current else edge[1]
     }
 
@@ -327,19 +341,19 @@ add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> 
     {
         if distance_sq(graph.nodes[i], new_node_position) < 200*200
         {
-            edge : [2]int = { i, len(graph.nodes) }
+            edge : Edge = Edge{ endpoints = {i, len(graph.nodes)} }
             a := graph.nodes[i]
             b := new_node_position
             intersects := false
             for edge2 in graph.edges
             {
-                if edge2[0] == i do continue
-                if edge2[1] == i do continue
-                if edge2[0] == len(graph.nodes) do continue
-                if edge2[1] == len(graph.nodes) do continue
+                if edge2.endpoints[0] == i do continue
+                if edge2.endpoints[1] == i do continue
+                if edge2.endpoints[0] == len(graph.nodes) do continue
+                if edge2.endpoints[1] == len(graph.nodes) do continue
 
-                c := graph.nodes[edge2[0]]
-                d := graph.nodes[edge2[1]]
+                c := graph.nodes[edge2.endpoints[0]]
+                d := graph.nodes[edge2.endpoints[1]]
 
                 intersects = intersect(a, b, c, d)
                 if intersects
@@ -405,6 +419,60 @@ generate_graph :: proc(graph : ^Graph)
     find_faces(graph)
 }
 
+hit :: proc(graph : Graph, x, y : f32) -> union{int}
+{
+    for node, node_index in graph.nodes
+    {
+        if distance_sq({x, y}, node) <= 15*15
+        {
+            return node_index
+        }
+    }
+    return nil
+}
+
+adjacent :: proc(graph : Graph, a, b : int) -> (bool, int)
+{
+    iterator := Neighbors{ graph = graph, source = a }
+    for neighbor_index, edge_id in neighbors(&iterator)
+    {
+        if neighbor_index == b do return true, edge_id
+    }
+    return false, 0
+}
+
+declare_safe :: proc(graph : Graph, safe_edge_id : int)
+{
+    graph.edges[safe_edge_id].safety = .SAFE
+    
+    for &face in graph.faces
+    {
+        count_unsafe := 0
+        count_safe := 0
+        apply := false
+        for edge_id in face.edges
+        {
+            if graph.edges[edge_id].safety == .SAFE do count_safe += 1
+            if graph.edges[edge_id].safety == .UNSAFE do count_unsafe += 1
+
+            if edge_id == safe_edge_id do apply = true
+        }
+
+        if apply
+        {
+            // if count_unsafe == face.count do for edge_id in face.edges
+            // {
+            //     if graph.edges[edge_id].safety == .UNKNOWN do graph.edges[edge_id].safety = .SAFE
+            // }
+
+            if count_safe == len(face.edges) - face.count do for edge_id in face.edges
+            {
+                if graph.edges[edge_id].safety == .UNKNOWN do graph.edges[edge_id].safety = .UNSAFE
+            }
+        }
+    }
+}
+
 main :: proc()
 {
     // theta0 : f32 = 1*math.PI / 6
@@ -426,11 +494,11 @@ main :: proc()
     append(&graph.nodes, Node{ position={1, 1} })
     append(&graph.nodes, Node{ position={1, 0} })
     
-    append(&graph.edges, [2]int{0, 1})
-    append(&graph.edges, [2]int{1, 2})
-    append(&graph.edges, [2]int{2, 3})
-    append(&graph.edges, [2]int{3, 0})
-    append(&graph.edges, [2]int{2, 0})
+    append(&graph.edges, Edge{endpoints=[2]int{0, 1}})
+    append(&graph.edges, Edge{endpoints=[2]int{1, 2}})
+    append(&graph.edges, Edge{endpoints=[2]int{2, 3}})
+    append(&graph.edges, Edge{endpoints=[2]int{3, 0}})
+    append(&graph.edges, Edge{endpoints=[2]int{2, 0}})
 
     // n, e := circular_walk(graph, 2, 4)
     // fmt.println(n, e)
