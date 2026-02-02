@@ -1,0 +1,7 @@
+- improved graph generation
+  - don't allow trivially unsolvable webs
+  - write an actual solver
+- add a timer
+- rewrite graphics code
+- take another look at math code
+- make it prettier to look at

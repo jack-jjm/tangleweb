@@ -87,7 +87,7 @@ main :: proc()
                 yes, edge_id := graph.adjacent(g, hit, current_node)
                 if yes && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
                 {
-                    if graph.contains(g.path[:], edge_id)
+                    if g.edges[edge_id].lethal
                     {
                         fmt.println("dead")
                         dead = true
@@ -128,6 +128,11 @@ main :: proc()
                 case .SAFE: color = rl.GREEN
                 case .UNSAFE: color = rl.RED
             }
+
+            if show_path
+            {
+                color = rl.RED if edge.lethal else rl.WHITE
+            }
             
             rl.DrawLine(
                 a_screen.x, a_screen.y,
@@ -166,20 +171,6 @@ main :: proc()
             screen := node_to_pixel(g, window, p)
             rl.DrawCircle(
                 screen.x, screen.y, 10, rl.YELLOW
-            )
-        }
-
-        if show_path do for edge_index in g.path
-        {
-            edge := g.edges[edge_index].endpoints
-            a := g.nodes[edge[0]]
-            b := g.nodes[edge[1]]
-            a_screen := node_to_pixel(g, window, a)
-            b_screen := node_to_pixel(g, window, b)
-            rl.DrawLine(
-                a_screen.x, a_screen.y,
-                b_screen.x, b_screen.y,
-                rl.RED
             )
         }
 

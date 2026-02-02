@@ -16,6 +16,7 @@ Node :: struct {
 
 Edge :: struct {
     using endpoints : [2]int,
+    lethal : bool,
     safety : Safety
 }
 
@@ -27,10 +28,9 @@ Face :: struct {
 Graph :: struct {
     nodes : [dynamic]Node,
     edges : [dynamic]Edge,
+    faces : [dynamic]Face,
     width : f32,
-    height : f32,
-    path : [dynamic]int,
-    faces : [dynamic]Face
+    height : f32
 }
 
 distance_sq :: proc(a, b : [2]f32) -> f32
@@ -54,27 +54,18 @@ intersect :: proc(a, b, c, d : [2]f32) -> bool
     return coordinates.x >= 0 && coordinates.y >= 0 && coordinates.x + coordinates.y >= 1
 }
 
-contains :: proc(values : []$T, x : T) -> bool
-{
-    for y in values
-    {
-        if y == x do return true
-    }
-    return false
-}
-
-random_choice :: proc(values : []$T) -> (T, int)
+random_lethal_edge :: proc(graph : Graph) -> int
 {
     choice : int
-    for _, index in values
+    for edge, edge_id in graph.edges
     {
-        if rand.float32() < 1 / f32(index + 1)
+        if edge.lethal do if rand.float32() < 1 / f32(edge_id + 1)
         {
-            choice = index
+            choice = edge_id
         }
     }
 
-    return values[choice], choice
+    return choice
 }
 
 atan3 :: proc(x, y, theta0 : f32) -> f32
@@ -144,7 +135,7 @@ find_faces :: proc(graph : ^Graph)
         {
             face := Face{}
             append(&face.edges, edge_index)
-            if contains(graph.path[:], edge_index)
+            if graph.edges[edge_index].lethal
             {
                 face.count += 1
             }
@@ -168,7 +159,7 @@ find_faces :: proc(graph : ^Graph)
                 current_node, last_edge = circular_walk(graph^, current_node, last_edge)                
 
                 append(&face.edges, last_edge)
-                if contains(graph.path[:], last_edge)
+                if graph.edges[last_edge].lethal
                 {
                     face.count += 1
                 }
@@ -184,15 +175,15 @@ find_faces :: proc(graph : ^Graph)
 mutate_path :: proc(graph : ^Graph) -> bool
 {
     edge_index, path_index : int
-    new_segment : [dynamic]int = nil
+    success := false
     n_attempts := 0
-    for new_segment == nil
+    for !success
     {
         // pick a random edge on the path
-        edge_index, path_index = random_choice(graph.path[:])
+        edge_index = random_lethal_edge(graph^)
         edge := graph.edges[edge_index].endpoints
         
-        new_segment = find_path(graph^, edge[0], edge[1])
+        success = find_path(graph^, edge[0], edge[1])
 
         when ODIN_DEBUG
         {
@@ -204,14 +195,7 @@ mutate_path :: proc(graph : ^Graph) -> bool
         if n_attempts > 100 do return false
     }
 
-    unordered_remove(&graph.path, path_index)
-    for x in new_segment
-    {
-        when ODIN_DEBUG do fmt.println("  add", x)
-        append(&graph.path, x)
-    }
-    
-    delete(new_segment)
+    graph.edges[edge_index].lethal = false
 
     return true
 }
@@ -251,9 +235,8 @@ neighbors :: proc(iterator : ^Neighbors) -> (neighbor : int, edge_index : int, c
     return
 }
 
-find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
+find_path :: proc(graph : Graph, start, end : int) -> bool
 {
-    path := make([dynamic]int)
     frontier := new([dynamic]int)
     next_frontier := new([dynamic]int)
 
@@ -264,7 +247,7 @@ find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
     {
         if len(frontier) == 0
         {
-            return nil
+            return false
         }
 
         for node_index in frontier
@@ -274,7 +257,7 @@ find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
             {
                 if neighbor == start do continue
 
-                if contains(graph.path[:], edge_index) do continue
+                if graph.edges[edge_index].lethal do continue
 
                 if graph.nodes[neighbor].on_path && neighbor != end do continue
 
@@ -297,14 +280,14 @@ find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
     {
         graph.nodes[current].on_path = true
         edge_index := graph.nodes[current].previous.(int)
-        append(&path, edge_index)
+        graph.edges[edge_index].lethal = true
         edge := graph.edges[edge_index].endpoints
         current = edge[0] if edge[1] == current else edge[1]
     }
 
     graph.nodes[current].on_path = true
 
-    return path
+    return true
 }
 
 add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> bool
@@ -408,7 +391,7 @@ generate_graph :: proc(graph : ^Graph)
         x_max += elbow_room
     }
 
-    graph.path = find_path(graph^, 1, 2)
+    find_path(graph^, 1, 2)
 
     failed := false
     for !failed
