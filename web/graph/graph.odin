@@ -394,7 +394,7 @@ generate_graph :: proc(graph : ^Graph)
         x_max += elbow_room
     }
 
-    graph.path = find_path(graph^, 4, 6)
+    graph.path = find_path(graph^, 1, 2)
 
     failed := false
     for !failed
