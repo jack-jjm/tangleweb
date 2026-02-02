@@ -177,8 +177,13 @@ mutate_path :: proc(graph : ^Graph) -> bool
         // pick a random edge on the path
         edge_index, path_index = random_choice(graph.path[:])
         edge := graph.edges[edge_index]
-
+        
         new_segment = find_path(graph^, edge[0], edge[1])
+
+        when ODIN_DEBUG
+        {
+            if new_segment != nil do fmt.println("mutate", edge_index)
+        }
 
         n_attempts += 1
 
@@ -186,7 +191,11 @@ mutate_path :: proc(graph : ^Graph) -> bool
     }
 
     unordered_remove(&graph.path, path_index)
-    for x in new_segment do append(&graph.path, x)
+    for x in new_segment
+    {
+        when ODIN_DEBUG do fmt.println("  add", x)
+        append(&graph.path, x)
+    }
     
     delete(new_segment)
 
@@ -278,6 +287,8 @@ find_path :: proc(graph : Graph, start, end : int) -> [dynamic]int
         edge := graph.edges[edge_index]
         current = edge[0] if edge[1] == current else edge[1]
     }
+
+    graph.nodes[current].on_path = true
 
     return path
 }

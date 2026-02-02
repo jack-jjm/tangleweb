@@ -57,10 +57,13 @@ main :: proc()
                 rl.WHITE
             )
 
-            // label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", edge_index))
-            // defer delete(label)
-            // p := (a_screen + b_screen) / 2
-            // rl.DrawText(label, p.x + 3, p.y + 3, 12, rl.YELLOW)
+            when ODIN_DEBUG
+            {
+                label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", edge_index))
+                defer delete(label)
+                p := (a_screen + b_screen) / 2
+                rl.DrawText(label, p.x + 3, p.y + 3, 12, rl.YELLOW)
+            }
         }
 
         for node, index in g.nodes
@@ -72,9 +75,12 @@ main :: proc()
                 rl.WHITE
             )
 
-            // label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", index))
-            // defer delete(label)
-            // rl.DrawText(label, p.x + 10, p.y + 10, 15, rl.WHITE)
+            when ODIN_DEBUG
+            {
+                label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", index))
+                defer delete(label)
+                rl.DrawText(label, p.x + 10, p.y + 10, 15, rl.WHITE)
+            }
         }
 
         if show_path do for edge_index in g.path
