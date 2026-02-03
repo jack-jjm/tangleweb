@@ -190,7 +190,7 @@ mutate_path :: proc(graph : ^Graph) -> bool
         // pick a random edge on the path
         edge := graph.edges[edge_id].endpoints
         
-        path := find_path(graph^, edge[0], edge[1])
+        path := find_path(graph^, edge[0], edge[1], lethal_path_conditions)
         success = path.success
 
         when ODIN_DEBUG
@@ -253,7 +253,20 @@ neighbors :: proc(iterator : ^Neighbors) -> (neighbor : int, edge_index : int, c
     return
 }
 
-find_path :: proc(graph : Graph, start, end : int) -> Path
+lethal_path_conditions :: proc(graph : Graph, next_node_id, next_edge_id, goal_node_id : int) -> bool
+{
+    if next_node_id == 0 do return true // don't ever visit the player's start position, we don't want to block it off
+
+    if graph.edges[next_edge_id].lethal do return true // don't cross lethal edges
+
+    if graph.edges[next_edge_id].protected do return true // don't cross protected edges
+
+    if graph.nodes[next_node_id].on_path && next_node_id != goal_node_id do return true // don't visit nodes on the path, except maybe our target
+
+    return false
+}
+
+find_path :: proc(graph : Graph, start, end : int, other_conditions : proc(Graph, int, int, int) -> bool) -> Path
 {
     frontier := new([dynamic]int)
     next_frontier := new([dynamic]int)
@@ -273,17 +286,11 @@ find_path :: proc(graph : Graph, start, end : int) -> Path
             iterator := Neighbors{ graph=graph, source=node_index }
             for neighbor, edge_index in neighbors(&iterator)
             {
-                if neighbor == start do continue
+                if graph.nodes[neighbor].previous != nil do continue // don't visit nodes we've already visited this run
 
-                if neighbor == 0 do continue
+                if neighbor == start do continue // don't return to start node - it has no .previous field
 
-                if graph.edges[edge_index].lethal do continue
-
-                if graph.edges[edge_index].protected do continue
-
-                if graph.nodes[neighbor].on_path && neighbor != end do continue
-
-                if graph.nodes[neighbor].previous != nil do continue
+                if other_conditions(graph, neighbor, edge_index, end) do continue                
 
                 graph.nodes[neighbor].previous = edge_index
                 append(next_frontier, neighbor)
@@ -440,7 +447,28 @@ generate_graph :: proc(graph : ^Graph)
             x_max += elbow_room
         }
 
-        path := find_path(graph^, 1, 2)
+        solution_conditions :: proc(graph : Graph, next_node_id, next_edge_id, goal_node_id : int) -> bool
+        {
+            return false
+        }
+
+        solution := find_path(graph^, 0, 3, solution_conditions)
+        
+        if !solution.success
+        {
+            destroy(graph)
+            continue
+        }
+        
+        for node_id, edge_id in iter_path(&solution)
+        {
+            if edge_id == nil do break
+            
+            graph.edges[edge_id.(int)].protected = true
+            // graph.edges[edge_id.(int)].safety = .SAFE
+        }
+
+        path := find_path(graph^, 1, 2 , lethal_path_conditions)
 
         if !path.success
         {

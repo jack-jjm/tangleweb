@@ -46,7 +46,11 @@ create_node_sprite :: proc(g : graph.Graph, window : ScreenArea, node : graph.No
 
 main :: proc()
 {
-    // rand.reset(1)
+    seed := rand.uint64()
+    rand.reset(seed)
+    fmt.println("seed:", seed)
+
+    // rand.reset(7877500187719467802)
 
     rl.SetTraceLogLevel(rl.TraceLogLevel.WARNING)
     rl.InitWindow(1200 + 100, 600 + 100, "web")
