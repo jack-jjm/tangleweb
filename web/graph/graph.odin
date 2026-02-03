@@ -17,6 +17,7 @@ Node :: struct {
 Edge :: struct {
     using endpoints : [2]int,
     lethal : bool,
+    protected : bool,
     safety : Safety
 }
 
@@ -174,30 +175,47 @@ find_faces :: proc(graph : ^Graph)
 
 mutate_path :: proc(graph : ^Graph) -> bool
 {
-    edge_index, path_index : int
-    success := false
     n_attempts := 0
-    for !success
+
+    lethal_edges : [dynamic]int
+    for edge, edge_id in graph.edges
+    {
+        if edge.lethal do append(&lethal_edges, edge_id)
+    }
+    rand.shuffle(lethal_edges[:])
+
+    success := false
+    for edge_id in lethal_edges
     {
         // pick a random edge on the path
-        edge_index = random_lethal_edge(graph^)
-        edge := graph.edges[edge_index].endpoints
+        edge := graph.edges[edge_id].endpoints
         
-        success = find_path(graph^, edge[0], edge[1])
+        path := find_path(graph^, edge[0], edge[1])
+        success = path.success
 
         when ODIN_DEBUG
         {
-            if new_segment != nil do fmt.println("mutate", edge_index)
+            if success do fmt.println("mutate", edge_id)
         }
 
-        n_attempts += 1
+        if success
+        {
+            graph.edges[edge_id].lethal = false
 
-        if n_attempts > 100 do return false
+            for node_id, edge_id in iter_path(&path)
+            {
+                graph.nodes[node_id].on_path = true
+                if edge_id != nil
+                {
+                    graph.edges[edge_id.(int)].lethal = true
+                }
+            }
+
+            break
+        }
     }
 
-    graph.edges[edge_index].lethal = false
-
-    return true
+    return success
 }
 
 Neighbors :: struct {
@@ -235,7 +253,7 @@ neighbors :: proc(iterator : ^Neighbors) -> (neighbor : int, edge_index : int, c
     return
 }
 
-find_path :: proc(graph : Graph, start, end : int) -> bool
+find_path :: proc(graph : Graph, start, end : int) -> Path
 {
     frontier := new([dynamic]int)
     next_frontier := new([dynamic]int)
@@ -247,7 +265,7 @@ find_path :: proc(graph : Graph, start, end : int) -> bool
     {
         if len(frontier) == 0
         {
-            return false
+            return Path{ success = false, finished = true }
         }
 
         for node_index in frontier
@@ -257,7 +275,11 @@ find_path :: proc(graph : Graph, start, end : int) -> bool
             {
                 if neighbor == start do continue
 
+                if neighbor == 0 do continue
+
                 if graph.edges[edge_index].lethal do continue
+
+                if graph.edges[edge_index].protected do continue
 
                 if graph.nodes[neighbor].on_path && neighbor != end do continue
 
@@ -275,19 +297,37 @@ find_path :: proc(graph : Graph, start, end : int) -> bool
 
     // fmt.println()
 
-    current := end
-    for graph.nodes[current].previous != nil
+    return Path{ graph = graph, success = true, current_node_id = end }
+}
+
+Path :: struct {
+    success : bool,
+    current_node_id : int,
+    graph : Graph,
+    finished : bool
+}
+
+iter_path :: proc(path : ^Path) -> (node_id : int, edge_id : union{int}, index : int, more : bool)
+{
+    if path.finished do return 0, 0, 0, false
+
+    more = true
+
+    node_id = path.current_node_id
+    edge_id = path.graph.nodes[node_id].previous
+
+    if edge_id != nil
     {
-        graph.nodes[current].on_path = true
-        edge_index := graph.nodes[current].previous.(int)
-        graph.edges[edge_index].lethal = true
-        edge := graph.edges[edge_index].endpoints
-        current = edge[0] if edge[1] == current else edge[1]
+        edge := path.graph.edges[edge_id.(int)]
+        next_node_id := edge.endpoints[0] if edge.endpoints[1] == node_id else edge.endpoints[1]
+        path.current_node_id = next_node_id
+    }
+    else
+    {
+        path.finished = true
     }
 
-    graph.nodes[current].on_path = true
-
-    return true
+    return
 }
 
 add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> bool
@@ -391,7 +431,15 @@ generate_graph :: proc(graph : ^Graph)
         x_max += elbow_room
     }
 
-    find_path(graph^, 1, 2)
+    path := find_path(graph^, 1, 2)
+    for node_id, edge_id in iter_path(&path)
+    {
+        graph.nodes[node_id].on_path = true
+        if edge_id != nil
+        {
+            graph.edges[edge_id.(int)].lethal = true
+        }
+    }
 
     failed := false
     for !failed

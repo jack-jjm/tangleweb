@@ -8,7 +8,7 @@
             "name": "Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/graph",
+            "program": "${workspaceFolder}/web.bin",
             "args": [],
             "cwd": "${workspaceFolder}",
             "environment": [],
