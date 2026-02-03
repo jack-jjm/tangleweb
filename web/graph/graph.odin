@@ -394,60 +394,79 @@ add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> 
     return true
 }
 
+destroy :: proc(graph : ^Graph)
+{
+    clear(&graph.nodes)
+    clear(&graph.edges)
+    clear(&graph.faces)
+}
+
 generate_graph :: proc(graph : ^Graph)
 {
     r : f32 = 200
 
-    // left
-    add_point(graph, r, 0, 0, 0, graph.height) // 0
-    add_point(graph, r, 0, 0, 0, graph.height) // 1
-
-    // right
-    add_point(graph, r, graph.width, graph.width, 0, graph.height) // 2
-    add_point(graph, r, graph.width, graph.width, 0, graph.height) // 3
-    
-    // top
-    add_point(graph, r, 0, graph.width, 0, 0) // 4
-    add_point(graph, r, 0, graph.width, 0, 0) // 5
-    
-    // bottom
-    add_point(graph, r, 0, graph.width, graph.height, graph.height) // 6
-    add_point(graph, r, 0, graph.width, graph.height, graph.height) // 7
-
-    elbow_room : f32 = 100
-    x_min : f32 = 100
-    x_max : f32 = x_min + 2 * elbow_room
-    y_min : f32 = 0.1 * graph.height
-    y_max : f32 = 0.9 * graph.height
-    for x_max <= graph.width
+    for
     {
-        saturated := false
-        for !saturated
+        // left
+        add_point(graph, r, 0, 0, 0, graph.height) // 0
+        add_point(graph, r, 0, 0, 0, graph.height) // 1
+
+        // right
+        add_point(graph, r, graph.width, graph.width, 0, graph.height) // 2
+        add_point(graph, r, graph.width, graph.width, 0, graph.height) // 3
+        
+        // top
+        add_point(graph, r, 0, graph.width, 0, 0) // 4
+        add_point(graph, r, 0, graph.width, 0, 0) // 5
+        
+        // bottom
+        add_point(graph, r, 0, graph.width, graph.height, graph.height) // 6
+        add_point(graph, r, 0, graph.width, graph.height, graph.height) // 7
+
+        elbow_room : f32 = 100
+        x_min : f32 = 100
+        x_max : f32 = x_min + 2 * elbow_room
+        y_min : f32 = 0.1 * graph.height
+        y_max : f32 = 0.9 * graph.height
+        for x_max <= graph.width
         {
-            saturated = !add_point(graph, elbow_room, x_min, x_max, y_min, y_max)
+            saturated := false
+            for !saturated
+            {
+                saturated = !add_point(graph, elbow_room, x_min, x_max, y_min, y_max)
+            }
+
+            x_min += elbow_room
+            x_max += elbow_room
         }
 
-        x_min += elbow_room
-        x_max += elbow_room
-    }
+        path := find_path(graph^, 1, 2)
 
-    path := find_path(graph^, 1, 2)
-    for node_id, edge_id in iter_path(&path)
-    {
-        graph.nodes[node_id].on_path = true
-        if edge_id != nil
+        if !path.success
         {
-            graph.edges[edge_id.(int)].lethal = true
+            destroy(graph)
+            continue
         }
-    }
 
-    failed := false
-    for !failed
-    {
-        failed = !mutate_path(graph)
-    }
+        for node_id, edge_id in iter_path(&path)
+        {
+            graph.nodes[node_id].on_path = true
+            if edge_id != nil
+            {
+                graph.edges[edge_id.(int)].lethal = true
+            }
+        }
 
-    find_faces(graph)
+        failed := false
+        for !failed
+        {
+            failed = !mutate_path(graph)
+        }
+
+        find_faces(graph)
+
+        return
+    }
 }
 
 hit :: proc(graph : Graph, x, y : f32) -> union{int}
