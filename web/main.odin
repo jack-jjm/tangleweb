@@ -6,27 +6,9 @@ import "core:strings"
 import "core:math/rand"
 
 import "./graph"
+import "./window"
 
 PixelCoordinate :: i32
-
-ScreenArea :: struct {
-    x, y, width, height : PixelCoordinate
-}
-
-node_to_pixel :: proc(graph : graph.Graph, window : ScreenArea, node : [2]f32) -> [2]i32
-{
-    x := window.x + PixelCoordinate(f32(window.width) * (node.x / graph.width))
-    y := window.y + PixelCoordinate(f32(window.height) * (node.y / graph.height))
-    return { x, y }
-}
-
-pixel_to_node :: proc(graph : graph.Graph, window : ScreenArea, point : [2]f32) -> [2]f32
-{
-    relative := point - [2]f32{ f32(window.x), f32(window.y) }
-    x := f32(relative.x) * (graph.width / f32(window.width))
-    y := f32(relative.y) * (graph.height / f32(window.height))
-    return { x, y }
-}
 
 Node :: struct
 {
@@ -34,12 +16,11 @@ Node :: struct
     active : bool
 }
 
-create_node_sprite :: proc(g : graph.Graph, window : ScreenArea, node : graph.Node) -> Node
+create_node_sprite :: proc(g : graph.Graph, node : graph.Node) -> Node
 {
-    p := node_to_pixel(g, window, node)
     return {
-        x = p.x,
-        y = p.y,
+        x = i32(node.x),
+        y = i32(node.y),
         active = false
     }
 }
@@ -50,38 +31,45 @@ main :: proc()
     rand.reset(seed)
     fmt.println("seed:", seed)
 
-    // rand.reset(7877500187719467802)
+    // rand.reset(2818313247485133324)
+
+    // 600x300
 
     rl.SetTraceLogLevel(rl.TraceLogLevel.WARNING)
     rl.InitWindow(1200 + 100, 600 + 100, "web")
+    rl.SetWindowState({ .WINDOW_RESIZABLE })
     rl.SetTargetFPS(60)
 
-    g := graph.Graph{ width = 1200, height = 600 }
-    window := ScreenArea{ 50, 50, 1200, 600 }
+    g := graph.Graph{ x = 15, y = 10, width = 600 - 30, height = 300 - 20 }
 
     graph.generate_graph(&g)
 
     current_node := 0
     dead := false
 
+    texture := rl.LoadRenderTexture(600, 300)
+
     node_sprites := make([dynamic]Node)
-    for node in g.nodes do append(&node_sprites, create_node_sprite(g, window, node))
+    for node in g.nodes do append(&node_sprites, create_node_sprite(g, node))
 
     for !rl.WindowShouldClose()
     {
+        window.step()
+
         show_path := false
         if rl.IsKeyDown(rl.KeyboardKey.C)
         {
             show_path = true
         }
 
-        mouse := pixel_to_node(g, window, rl.GetMousePosition())
+        // mouse := pixel_to_node(g, area, rl.GetMousePosition())
 
         for &sprite in node_sprites do sprite.active = false
 
         if !dead
         {
-            hit := graph.hit(g, mouse.x, mouse.y)
+            // hit := graph.hit(g, mouse.x, mouse.y)
+            hit : union{int} = nil
             if hit != nil
             {
                 hit := hit.(int)
@@ -116,14 +104,14 @@ main :: proc()
 
         rl.BeginDrawing()
 
+        rl.BeginTextureMode(texture)
+
         rl.ClearBackground(rl.BLACK)
 
         for edge, edge_index in g.edges
         {
             a := g.nodes[edge.endpoints[0]]
             b := g.nodes[edge.endpoints[1]]
-            a_screen := node_to_pixel(g, window, a)
-            b_screen := node_to_pixel(g, window, b)
             
             color : rl.Color
             switch edge.safety
@@ -135,12 +123,12 @@ main :: proc()
 
             if show_path
             {
-                color = rl.RED if edge.lethal else rl.WHITE
+                color = rl.RED if edge.lethal else rl.GREEN if edge.protected else rl.WHITE
             }
             
             rl.DrawLine(
-                a_screen.x, a_screen.y,
-                b_screen.x, b_screen.y,
+                i32(a.x), i32(a.y),
+                i32(b.x), i32(b.y),
                 color
             )
 
@@ -148,7 +136,7 @@ main :: proc()
             {
                 label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", edge_index))
                 defer delete(label)
-                p := (a_screen + b_screen) / 2
+                p := i32((a + b) / 2)
                 rl.DrawText(label, p.x + 3, p.y + 3, 12, rl.YELLOW)
             }
         }
@@ -172,9 +160,8 @@ main :: proc()
         if !dead
         {
             p := g.nodes[current_node]
-            screen := node_to_pixel(g, window, p)
             rl.DrawCircle(
-                screen.x, screen.y, 10, rl.YELLOW
+                i32(p.x), i32(p.y), 10, rl.YELLOW
             )
         }
 
@@ -190,18 +177,39 @@ main :: proc()
             }
             total /= f32(2 * len(face.edges))
 
-            p := node_to_pixel(g, window, total)
-
             label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", face.count))
             defer delete(label)
             size := rl.MeasureText(label, 25)
-            rl.DrawText(label, p.x - size / 2, p.y - 12, 25, rl.WHITE)
+            rl.DrawText(label, i32(total.x) - size / 2, i32(total.y) - 12, 25, rl.WHITE)
         }
 
         if dead
         {
             rl.DrawText("DEAD", 110, 160, 400, rl.WHITE)
         }
+
+        rl.EndTextureMode()
+
+        rl.ClearBackground(rl.BLACK)
+
+        h_scale := f32(window.w) / f32(texture.texture.width)
+        v_scale := f32(window.h) / f32(texture.texture.height)
+        scale := min(h_scale, v_scale)
+
+        scaled_width  := f32(texture.texture.width) * scale
+        scaled_height := f32(texture.texture.height) * scale
+
+        x := (f32(window.w) - scaled_width) / 2
+        y := (f32(window.h) - scaled_height) / 2
+
+        rl.DrawTexturePro(
+            texture.texture,
+            { x=0, y=0, width=600, height=-300 },
+            { x=x, y=y, width=scaled_width, height=scaled_height },
+            { 0, 0 },
+            0,
+            rl.WHITE
+        )
 
         rl.EndDrawing()
     }

@@ -30,6 +30,7 @@ Graph :: struct {
     nodes : [dynamic]Node,
     edges : [dynamic]Edge,
     faces : [dynamic]Face,
+    x, y : f32,
     width : f32,
     height : f32
 }
@@ -339,6 +340,11 @@ iter_path :: proc(path : ^Path) -> (node_id : int, edge_id : union{int}, index :
 
 add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> bool
 {
+    x_min := graph.x + x_min
+    x_max := graph.x + x_max
+    y_min := graph.y + y_min
+    y_max := graph.y + y_max
+
     new_node_position : [2]f32
     accepted := false
     n_attempts := 0
@@ -410,7 +416,7 @@ destroy :: proc(graph : ^Graph)
 
 generate_graph :: proc(graph : ^Graph)
 {
-    r : f32 = 200
+    r : f32 = 100
 
     for
     {
@@ -430,8 +436,8 @@ generate_graph :: proc(graph : ^Graph)
         add_point(graph, r, 0, graph.width, graph.height, graph.height) // 6
         add_point(graph, r, 0, graph.width, graph.height, graph.height) // 7
 
-        elbow_room : f32 = 100
-        x_min : f32 = 100
+        elbow_room : f32 = 60
+        x_min : f32 = elbow_room
         x_max : f32 = x_min + 2 * elbow_room
         y_min : f32 = 0.1 * graph.height
         y_max : f32 = 0.9 * graph.height
@@ -443,8 +449,8 @@ generate_graph :: proc(graph : ^Graph)
                 saturated = !add_point(graph, elbow_room, x_min, x_max, y_min, y_max)
             }
 
-            x_min += elbow_room
-            x_max += elbow_room
+            x_min += 2*elbow_room
+            x_max += 2*elbow_room
         }
 
         solution_conditions :: proc(graph : Graph, next_node_id, next_edge_id, goal_node_id : int) -> bool
