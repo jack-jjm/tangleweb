@@ -62,14 +62,24 @@ main :: proc()
             show_path = true
         }
 
-        // mouse := pixel_to_node(g, area, rl.GetMousePosition())
+        h_scale := f32(window.w) / f32(texture.texture.width)
+        v_scale := f32(window.h) / f32(texture.texture.height)
+        scale := min(h_scale, v_scale)
+
+        scaled_width  := f32(texture.texture.width) * scale
+        scaled_height := f32(texture.texture.height) * scale
+
+        x := (f32(window.w) - scaled_width) / 2
+        y := (f32(window.h) - scaled_height) / 2
+
+        screen_mouse := rl.GetMousePosition()
+        mouse : [2]f32 = { f32(screen_mouse.x - x) / scale, f32(screen_mouse.y - y) / scale }
 
         for &sprite in node_sprites do sprite.active = false
 
         if !dead
         {
-            // hit := graph.hit(g, mouse.x, mouse.y)
-            hit : union{int} = nil
+            hit := graph.hit(g, mouse.x, mouse.y)
             if hit != nil
             {
                 hit := hit.(int)
@@ -110,8 +120,8 @@ main :: proc()
 
         for edge, edge_index in g.edges
         {
-            a := g.nodes[edge.endpoints[0]]
-            b := g.nodes[edge.endpoints[1]]
+            a := g.nodes[edge.endpoints[0]].position
+            b := g.nodes[edge.endpoints[1]].position
             
             color : rl.Color
             switch edge.safety
@@ -136,8 +146,8 @@ main :: proc()
             {
                 label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", edge_index))
                 defer delete(label)
-                p := i32((a + b) / 2)
-                rl.DrawText(label, p.x + 3, p.y + 3, 12, rl.YELLOW)
+                p := (a + b) / 2
+                rl.DrawText(label, i32(p.x) + 3, i32(p.y) + 3, 12, rl.YELLOW)
             }
         }
 
@@ -185,22 +195,13 @@ main :: proc()
 
         if dead
         {
-            rl.DrawText("DEAD", 110, 160, 400, rl.WHITE)
+            width := rl.MeasureText("DEAD", 200)
+            rl.DrawText("DEAD", (600 - width) / 2, 50, 200, rl.RED)
         }
 
         rl.EndTextureMode()
 
         rl.ClearBackground(rl.BLACK)
-
-        h_scale := f32(window.w) / f32(texture.texture.width)
-        v_scale := f32(window.h) / f32(texture.texture.height)
-        scale := min(h_scale, v_scale)
-
-        scaled_width  := f32(texture.texture.width) * scale
-        scaled_height := f32(texture.texture.height) * scale
-
-        x := (f32(window.w) - scaled_width) / 2
-        y := (f32(window.h) - scaled_height) / 2
 
         rl.DrawTexturePro(
             texture.texture,
