@@ -23,7 +23,8 @@ Edge :: struct {
 
 Face :: struct {
     edges : [dynamic]int,
-    count : int
+    count : int,
+    area : f32
 }
 
 Graph :: struct {
@@ -126,13 +127,43 @@ circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) 
     return
 }
 
+ShoelaceFormula :: struct {
+    first, last : [2]f32,
+    area : f32,
+    initialized : bool
+}
+
+add_shoelace_point :: proc(shoelace : ^ShoelaceFormula, point : [2]f32)
+{
+    if !shoelace.initialized
+    {
+        shoelace.first = point
+        shoelace.initialized = true
+    }
+
+    last := shoelace.last
+    shoelace.area += point.y * last.x - point.x * last.y
+    shoelace.last = point
+}
+
+close_shoelace :: proc(shoelace : ^ShoelaceFormula) -> f32
+{
+    first := shoelace.first
+    last := shoelace.last
+    shoelace.area += first.y * last.x - first.x * last.y
+    return shoelace.area / 2
+}
+
 find_faces :: proc(graph : ^Graph)
 {
-    for node, node_index in graph.nodes
+    biggest_face_index : int
+    biggest_face_area : f32 = 0
+
+    for _, start_node_id in graph.nodes
     {
         // fmt.println("from", node_index)
 
-        iterator := Neighbors{ graph=graph^, source=node_index }
+        iterator := Neighbors{ graph=graph^, source=start_node_id }
         for neighbor, edge_index in neighbors(&iterator)
         {
             face := Face{}
@@ -144,13 +175,17 @@ find_faces :: proc(graph : ^Graph)
 
             is_face_valid := true
 
-            current_node := neighbor
+            shoelace : ShoelaceFormula = {}
+            add_shoelace_point(&shoelace, graph.nodes[start_node_id].position)
+
+            current_node_id := neighbor
             last_edge := edge_index
-            for current_node != node_index
+            for current_node_id != start_node_id
             {
                 // fmt.println(" go", current_node, last_edge)
+                add_shoelace_point(&shoelace, graph.nodes[current_node_id].position)
 
-                if graph.nodes[current_node].faces_calculated
+                if graph.nodes[current_node_id].faces_calculated
                 {
                     // we've already computed this face
                     delete(face.edges)
@@ -158,7 +193,7 @@ find_faces :: proc(graph : ^Graph)
                     break
                 }
 
-                current_node, last_edge = circular_walk(graph^, current_node, last_edge)                
+                current_node_id, last_edge = circular_walk(graph^, current_node_id, last_edge)                
 
                 append(&face.edges, last_edge)
                 if graph.edges[last_edge].lethal
@@ -167,11 +202,25 @@ find_faces :: proc(graph : ^Graph)
                 }
             }
 
-            if is_face_valid do append(&graph.faces, face)
+            area := close_shoelace(&shoelace)
+            face.area = area
+
+            if is_face_valid
+            {
+                append(&graph.faces, face)
+
+                if area > biggest_face_area
+                {
+                    biggest_face_index = len(graph.faces) - 1
+                    biggest_face_area = area
+                }
+            }
         }
 
-        graph.nodes[node_index].faces_calculated = true
+        graph.nodes[start_node_id].faces_calculated = true
     }
+
+    unordered_remove(&graph.faces, biggest_face_index)
 }
 
 mutate_path :: proc(graph : ^Graph) -> bool
