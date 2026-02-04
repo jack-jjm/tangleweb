@@ -338,7 +338,7 @@ iter_path :: proc(path : ^Path) -> (node_id : int, edge_id : union{int}, index :
     return
 }
 
-add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> bool
+add_point :: proc(graph : ^Graph, min_distance : f32, max_distance : f32, x_min, x_max, y_min, y_max : f32) -> bool
 {
     x_min := graph.x + x_min
     x_max := graph.x + x_max
@@ -358,7 +358,7 @@ add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> 
         accepted  = true
         for node in graph.nodes
         {
-            if distance_sq(node, new_node_position) <= r*r
+            if distance_sq(node, new_node_position) <= min_distance*min_distance
             {
                 accepted = false
                 break
@@ -375,7 +375,7 @@ add_point :: proc(graph : ^Graph, r : f32, x_min, x_max, y_min, y_max : f32) -> 
 
     for i in 0..<len(graph.nodes)
     {
-        if distance_sq(graph.nodes[i], new_node_position) < 200*200
+        if distance_sq(graph.nodes[i], new_node_position) < max_distance*max_distance
         {
             edge : Edge = Edge{ endpoints = {i, len(graph.nodes)} }
             a := graph.nodes[i]
@@ -417,28 +417,30 @@ destroy :: proc(graph : ^Graph)
 generate_graph :: proc(graph : ^Graph)
 {
     r : f32 = 100
+    R : f32 = 100
 
     for
     {
         // left
-        add_point(graph, r, 0, 0, 0, graph.height) // 0
-        add_point(graph, r, 0, 0, 0, graph.height) // 1
+        add_point(graph, r, R, 0, 0, 0, graph.height) // 0
+        add_point(graph, r, R, 0, 0, 0, graph.height) // 1
 
         // right
-        add_point(graph, r, graph.width, graph.width, 0, graph.height) // 2
-        add_point(graph, r, graph.width, graph.width, 0, graph.height) // 3
+        add_point(graph, r, R, graph.width, graph.width, 0, graph.height) // 2
+        add_point(graph, r, R, graph.width, graph.width, 0, graph.height) // 3
         
         // top
-        add_point(graph, r, 0, graph.width, 0, 0) // 4
-        add_point(graph, r, 0, graph.width, 0, 0) // 5
+        add_point(graph, r, R, 0, graph.width, 0, 0) // 4
+        add_point(graph, r, R, 0, graph.width, 0, 0) // 5
         
         // bottom
-        add_point(graph, r, 0, graph.width, graph.height, graph.height) // 6
-        add_point(graph, r, 0, graph.width, graph.height, graph.height) // 7
+        add_point(graph, r, R, 0, graph.width, graph.height, graph.height) // 6
+        add_point(graph, r, R, 0, graph.width, graph.height, graph.height) // 7
 
-        elbow_room : f32 = 60
-        x_min : f32 = elbow_room
-        x_max : f32 = x_min + 2 * elbow_room
+        column_width : f32 = graph.width / 6
+        buffer_radius : f32 = 50
+        x_min : f32 = column_width
+        x_max : f32 = x_min + column_width
         y_min : f32 = 0.1 * graph.height
         y_max : f32 = 0.9 * graph.height
         for x_max <= graph.width
@@ -446,11 +448,11 @@ generate_graph :: proc(graph : ^Graph)
             saturated := false
             for !saturated
             {
-                saturated = !add_point(graph, elbow_room, x_min, x_max, y_min, y_max)
+                saturated = !add_point(graph, buffer_radius, R, x_min, x_max, y_min, y_max)
             }
 
-            x_min += 2*elbow_room
-            x_max += 2*elbow_room
+            x_min += column_width
+            x_max += column_width
         }
 
         solution_conditions :: proc(graph : Graph, next_node_id, next_edge_id, goal_node_id : int) -> bool
