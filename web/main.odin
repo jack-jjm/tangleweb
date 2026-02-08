@@ -49,6 +49,8 @@ main :: proc()
     g := graph.Graph{ x = 15, y = 10, width = 600 - 30, height = 300 - 20 }
 
     graph.generate_graph(&g)
+    
+    solver := graph.init_solver(&g)
 
     current_node := 0
     dead := false
@@ -233,7 +235,7 @@ main :: proc()
                             else
                             {
                                 current_node = button.node_id                                
-                                graph.declare_safe(g, edge_id)
+                                graph.declare_safe(solver, edge_id)
 
                                 if button.node_id == 3
                                 {
@@ -269,14 +271,14 @@ main :: proc()
                     label.color = FACE_LABEL_COLOR
                 }
 
-                graph.reset_solver(g)
+                graph.reset_solver(solver)
             }
         }
 
         if !dead && !win do for edge, edge_id in g.edges
         {
             line := &web_lines[edge_id]
-            if !rl.IsKeyDown(rl.KeyboardKey.C) do switch edge.safety
+            if !rl.IsKeyDown(rl.KeyboardKey.C) do switch solver.edges[edge_id]
             {
                 case .UNKNOWN:
                     line.color = WEB_COLOR_DEFAULT
