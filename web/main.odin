@@ -7,23 +7,7 @@ import "core:math/rand"
 
 import "./graph"
 import "./window"
-
-PixelCoordinate :: i32
-
-Node :: struct
-{
-    using position : [2]i32,
-    active : bool
-}
-
-create_node_sprite :: proc(g : graph.Graph, node : graph.Node) -> Node
-{
-    return {
-        x = i32(node.x),
-        y = i32(node.y),
-        active = false
-    }
-}
+import r "./rendering"
 
 main :: proc()
 {
@@ -47,10 +31,64 @@ main :: proc()
     current_node := 0
     dead := false
 
-    texture := rl.LoadRenderTexture(600, 300)
+    for n, n_id in g.nodes
+    {
+        square := r.Square{
+            x = i32(n.x), y = i32(n.y),
+            size = 8,
+            color = rl.WHITE
+        }
+        entity_id := r.add(square)
 
-    node_sprites := make([dynamic]Node)
-    for node in g.nodes do append(&node_sprites, create_node_sprite(g, node))
+        click_area := r.ClickArea{
+            box = { x = i32(n.x - 4), y = i32(n.y - 4), w = 8, h = 8 },
+            node_id = n_id,
+            entity_id = entity_id
+        }
+
+        r.add_click_area(click_area)
+    }
+
+    for e in g.edges
+    {
+        a, b := e.endpoints[0], e.endpoints[1]
+        line := r.Line{
+            p1 = g.nodes[a],
+            p2 = g.nodes[b],
+            color = rl.WHITE
+        }
+        r.add(line)
+    }
+
+    for face in g.faces
+    {
+        barycenter : [2]i32
+        for e in face.edges
+        {
+            a := g.nodes[g.edges[e].endpoints[0]]
+            b := g.nodes[g.edges[e].endpoints[1]]
+            barycenter += a
+            barycenter += b
+        }
+        barycenter = barycenter / i32(2 * len(face.edges))
+
+        formatted := fmt.aprintf("%d", face.count)
+        defer delete(formatted)
+
+        text := strings.clone_to_cstring(formatted)
+
+        label := r.Label{
+            text = text,
+            center = barycenter,
+            color = rl.WHITE,
+            font_height = 11
+        }
+        r.add(label)
+    }
+
+    player_id := r.add(r.Square{ center = g.nodes[0], size = 15, color = rl.ORANGE })
+
+    texture := rl.LoadRenderTexture(600, 300)
 
     for !rl.WindowShouldClose()
     {
@@ -73,33 +111,44 @@ main :: proc()
         y := (f32(window.h) - scaled_height) / 2
 
         screen_mouse := rl.GetMousePosition()
-        mouse : [2]f32 = { f32(screen_mouse.x - x) / scale, f32(screen_mouse.y - y) / scale }
-
-        for &sprite in node_sprites do sprite.active = false
+        mouse : [2]i32 = {
+            i32(f32(screen_mouse.x - x) / scale),
+            i32(f32(screen_mouse.y - y) / scale)
+        }
 
         if !dead
         {
-            hit := graph.hit(g, mouse.x, mouse.y)
-            if hit != nil
+            for click_area in r.click_areas
             {
-                hit := hit.(int)
+                entity := r.get_entity(click_area.entity_id)
+                square := cast(^r.Square) entity
+                square.color = rl.BLACK
 
-                node_sprites[hit].active = true
-                
-                yes, edge_id := graph.adjacent(g, hit, current_node)
-                if yes && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
+                if r.collide(mouse, click_area)
                 {
-                    if g.edges[edge_id].lethal
-                    {
-                        fmt.println("dead")
-                        dead = true
-                    }
-                    else
-                    {
-                        graph.declare_safe(g, edge_id)
-                    }
+                    legal, edge_id := graph.adjacent(g, current_node, click_area.node_id)
 
-                    current_node = hit
+                    if legal
+                    {
+                        square.color = rl.WHITE
+
+                        if rl.IsMouseButtonPressed(.LEFT)
+                        {
+                            if g.edges[edge_id].lethal
+                            {
+                                dead = true
+                                fmt.println("dead")
+                            }
+                            else
+                            {
+                                current_node = click_area.node_id
+                                e := r.get_entity(player_id)
+                                s := cast(^r.Square) e
+                                s.x = cast(i32) g.nodes[current_node].x
+                                s.y = cast(i32) g.nodes[current_node].y
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -118,85 +167,9 @@ main :: proc()
 
         rl.ClearBackground(rl.BLACK)
 
-        for edge, edge_index in g.edges
+        for e in r.entities
         {
-            a := g.nodes[edge.endpoints[0]].position
-            b := g.nodes[edge.endpoints[1]].position
-            
-            color : rl.Color
-            switch edge.safety
-            {
-                case .UNKNOWN: color = rl.WHITE
-                case .SAFE: color = rl.GREEN
-                case .UNSAFE: color = rl.RED
-            }
-
-            if show_path
-            {
-                color = rl.RED if edge.lethal else rl.GREEN if edge.protected else rl.WHITE
-            }
-            
-            rl.DrawLine(
-                i32(a.x), i32(a.y),
-                i32(b.x), i32(b.y),
-                color
-            )
-
-            when ODIN_DEBUG
-            {
-                label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", edge_index))
-                defer delete(label)
-                p := (a + b) / 2
-                rl.DrawText(label, i32(p.x) + 3, i32(p.y) + 3, 12, rl.YELLOW)
-            }
-        }
-
-        for p, index in node_sprites
-        {
-            if p.active do rl.DrawRectangle(
-                p.x - 5, p.y - 5,
-                10, 10,
-                rl.WHITE
-            )
-
-            when ODIN_DEBUG
-            {
-                label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", index))
-                defer delete(label)
-                rl.DrawText(label, p.x + 10, p.y + 10, 15, rl.WHITE)
-            }
-        }
-
-        if !dead
-        {
-            p := g.nodes[current_node]
-            rl.DrawCircle(
-                i32(p.x), i32(p.y), 10, rl.YELLOW
-            )
-        }
-
-        for face in g.faces
-        {
-            total : [2]f32
-            for edge_index in face.edges
-            {
-                edge := g.edges[edge_index].endpoints
-                a := g.nodes[edge[0]].position
-                b := g.nodes[edge[1]].position
-                total += a + b
-            }
-            total /= f32(2 * len(face.edges))
-
-            label := strings.unsafe_string_to_cstring(fmt.aprintf("%d", face.count))
-            defer delete(label)
-            size := rl.MeasureText(label, 25)
-            rl.DrawText(label, i32(total.x) - size / 2, i32(total.y) - 12, 25, rl.WHITE)
-        }
-
-        if dead
-        {
-            width := rl.MeasureText("DEAD", 200)
-            rl.DrawText("DEAD", (600 - width) / 2, 50, 200, rl.RED)
+            r.render(e)
         }
 
         rl.EndTextureMode()

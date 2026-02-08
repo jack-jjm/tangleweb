@@ -8,7 +8,7 @@ import "core:math/linalg"
 Safety :: enum { UNKNOWN, SAFE, UNSAFE }
 
 Node :: struct {
-    using position : [2]f32,
+    using position : [2]i32,
     previous : union{int},
     on_path : bool,
     faces_calculated : bool
@@ -31,28 +31,58 @@ Graph :: struct {
     nodes : [dynamic]Node,
     edges : [dynamic]Edge,
     faces : [dynamic]Face,
-    x, y : f32,
-    width : f32,
-    height : f32
+    x, y : i32,
+    width : i32,
+    height : i32
 }
 
-distance_sq :: proc(a, b : [2]f32) -> f32
+ShoelaceFormula :: struct {
+    first, last : [2]i32,
+    area : f32,
+    initialized : bool
+}
+
+add_shoelace_point :: proc(shoelace : ^ShoelaceFormula, point : [2]i32)
+{
+    if !shoelace.initialized
+    {
+        shoelace.first = point
+        shoelace.initialized = true
+    }
+
+    last := shoelace.last
+    shoelace.area += f32(point.y * last.x - point.x * last.y)
+    shoelace.last = point
+}
+
+close_shoelace :: proc(shoelace : ^ShoelaceFormula) -> f32
+{
+    first := shoelace.first
+    last := shoelace.last
+    shoelace.area += f32(first.y * last.x - first.x * last.y)
+    return shoelace.area / 2
+}
+
+distance_sq :: proc(a, b : [2]i32) -> i32
 {
     return (a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y)
 }
 
-intersect :: proc(a, b, c, d : [2]f32) -> bool
+intersect :: proc(a, b, c, d : [2]i32) -> bool
 {
     u := a - c
     v := b - c
     M := linalg.Matrix2f32{
-        u.x, v.x, u.y, v.y
+        f32(u.x),
+        f32(v.x),
+        f32(u.y),
+        f32(v.y)
     }
     iM := linalg.matrix2x2_inverse(M)
     g := d - c
     coordinates := [2]f32{
-        iM[0, 0] * g.x + iM[0, 1] * g.y,
-        iM[1, 0] * g.x + iM[1, 1] * g.y
+        iM[0, 0] * f32(g.x) + iM[0, 1] * f32(g.y),
+        iM[1, 0] * f32(g.x) + iM[1, 1] * f32(g.y)
     }
     return coordinates.x >= 0 && coordinates.y >= 0 && coordinates.x + coordinates.y >= 1
 }
@@ -96,7 +126,7 @@ circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) 
     previous_node := graph.nodes[previous_node_index]
 
     vector := previous_node.position - current_node.position
-    theta0 := math.atan2(vector[1], vector[0])
+    theta0 := math.atan2(cast(f32) vector[1],cast(f32) vector[0])
     if theta0 < 0 do theta0 += 2*math.PI
 
     next_node_index = previous_node_index
@@ -112,7 +142,7 @@ circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) 
         
         neighbor := graph.nodes[neighbor_index]
         vector := neighbor.position - current_node.position
-        angle := atan3(vector[0], vector[1], theta0)
+        angle := atan3(cast(f32) vector[0], cast(f32) vector[1], theta0)
         
         // fmt.println("  ", neighbor_index, deg(angle))
 
@@ -125,33 +155,6 @@ circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) 
     }
 
     return
-}
-
-ShoelaceFormula :: struct {
-    first, last : [2]f32,
-    area : f32,
-    initialized : bool
-}
-
-add_shoelace_point :: proc(shoelace : ^ShoelaceFormula, point : [2]f32)
-{
-    if !shoelace.initialized
-    {
-        shoelace.first = point
-        shoelace.initialized = true
-    }
-
-    last := shoelace.last
-    shoelace.area += point.y * last.x - point.x * last.y
-    shoelace.last = point
-}
-
-close_shoelace :: proc(shoelace : ^ShoelaceFormula) -> f32
-{
-    first := shoelace.first
-    last := shoelace.last
-    shoelace.area += first.y * last.x - first.x * last.y
-    return shoelace.area / 2
 }
 
 find_faces :: proc(graph : ^Graph)
@@ -387,21 +390,21 @@ iter_path :: proc(path : ^Path) -> (node_id : int, edge_id : union{int}, index :
     return
 }
 
-add_point :: proc(graph : ^Graph, min_distance : f32, max_distance : f32, x_min, x_max, y_min, y_max : f32) -> bool
+add_point :: proc(graph : ^Graph, min_distance : i32, max_distance : i32, x_min, x_max, y_min, y_max : i32) -> bool
 {
     x_min := graph.x + x_min
     x_max := graph.x + x_max
     y_min := graph.y + y_min
     y_max := graph.y + y_max
 
-    new_node_position : [2]f32
+    new_node_position : [2]i32
     accepted := false
     n_attempts := 0
     for !accepted
     {
-        new_node_position = [2]f32{
-            x_min + rand.float32() * (x_max - x_min),
-            y_min + rand.float32() * (y_max - y_min)
+        new_node_position = [2]i32{
+            x_min + i32(rand.float32() * f32(x_max - x_min)),
+            y_min + i32(rand.float32() * f32(y_max - y_min))
         }
 
         accepted  = true
@@ -465,8 +468,8 @@ destroy :: proc(graph : ^Graph)
 
 generate_graph :: proc(graph : ^Graph)
 {
-    r : f32 = 100
-    R : f32 = 100
+    r : i32 = 100
+    R : i32 = 100
 
     for
     {
@@ -486,12 +489,12 @@ generate_graph :: proc(graph : ^Graph)
         add_point(graph, r, R, 0, graph.width, graph.height, graph.height) // 6
         add_point(graph, r, R, 0, graph.width, graph.height, graph.height) // 7
 
-        column_width : f32 = graph.width / 6
-        buffer_radius : f32 = 50
-        x_min : f32 = column_width
-        x_max : f32 = x_min + column_width
-        y_min : f32 = 0.1 * graph.height
-        y_max : f32 = 0.9 * graph.height
+        column_width : i32 = graph.width / 6
+        buffer_radius : i32 = 50
+        x_min : i32 = i32(column_width)
+        x_max : i32 = i32(x_min + column_width)
+        y_min : i32 = i32(0.1 * f32(graph.height))
+        y_max : i32 = i32(0.9 * f32(graph.height))
         for x_max <= graph.width
         {
             saturated := false
@@ -552,18 +555,6 @@ generate_graph :: proc(graph : ^Graph)
 
         return
     }
-}
-
-hit :: proc(graph : Graph, x, y : f32) -> union{int}
-{
-    for node, node_index in graph.nodes
-    {
-        if distance_sq({x, y}, node) <= 15*15
-        {
-            return node_index
-        }
-    }
-    return nil
 }
 
 adjacent :: proc(graph : Graph, a, b : int) -> (bool, int)
