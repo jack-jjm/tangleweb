@@ -8,6 +8,8 @@ import "core:math/rand"
 import "./graph"
 import "./window"
 
+girl_sprite_data := #load("../graphics/girl.png")
+
 NodeButton :: struct {
     using box : Rectangle,
     node_id : int,
@@ -17,10 +19,10 @@ NodeButton :: struct {
 node_buttons : [dynamic]NodeButton
 web_lines : [dynamic]Line
 face_labels : [dynamic]Label
-player : Square
+player : Sprite
 
 WEB_COLOR_DEFAULT : rl.Color = { 80, 103, 91, 255 }
-WEB_COLOR_DEADLY  : rl.Color = { 131, 53, 61, 255 }
+WEB_COLOR_DEADLY  : rl.Color = { 181, 53, 61, 255 }
 WEB_COLOR_SAFE    : rl.Color = { 223, 229, 233, 255 }
 
 FACE_LABEL_COLOR := WEB_COLOR_SAFE
@@ -102,10 +104,12 @@ main :: proc()
         append(&face_labels, label)
     }
 
-    player = Square{
+    girl_image := rl.LoadImageFromMemory(".png", raw_data(girl_sprite_data), cast(i32) len(girl_sprite_data))
+    girl_texture := rl.LoadTextureFromImage(girl_image)
+
+    player = Sprite{
         center = g.nodes[0],
-        size = 15,
-        color = rl.ORANGE
+        texture = girl_texture
     }
 
     dead_label := Label{
@@ -188,11 +192,6 @@ main :: proc()
                 player.hidden = false
                 dead_label.hidden = true
 
-                for &button in node_buttons
-                {
-                    button.sprite.hidden = false
-                }
-
                 for &label in face_labels
                 {
                     label.color = FACE_LABEL_COLOR
@@ -205,7 +204,7 @@ main :: proc()
         if !dead do for edge, edge_id in g.edges
         {
             line := &web_lines[edge_id]
-            switch edge.safety
+            if !rl.IsKeyDown(rl.KeyboardKey.C) do switch edge.safety
             {
                 case .UNKNOWN:
                     line.color = WEB_COLOR_DEFAULT
@@ -215,6 +214,14 @@ main :: proc()
 
                 case .UNSAFE:
                     line.color = WEB_COLOR_DEADLY
+            }
+            else do switch edge.lethal
+            {
+                case true:
+                    line.color = WEB_COLOR_DEADLY
+                    
+                case false:
+                    line.color = WEB_COLOR_SAFE
             }
         }
         else
@@ -261,7 +268,7 @@ main :: proc()
             render_label(label)
         }
 
-        render_square(player)
+        render_sprite(player)
 
         render_label(dead_label)
 

@@ -594,11 +594,6 @@ declare_safe :: proc(graph : Graph, safe_edge_id : int)
 
         if apply
         {
-            // if count_unsafe == face.count do for edge_id in face.edges
-            // {
-            //     if graph.edges[edge_id].safety == .UNKNOWN do graph.edges[edge_id].safety = .SAFE
-            // }
-
             if count_safe == len(face.edges) - face.count do for edge_id in face.edges
             {
                 if graph.edges[edge_id].safety == .UNKNOWN do graph.edges[edge_id].safety = .UNSAFE

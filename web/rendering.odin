@@ -9,6 +9,12 @@ Square :: struct {
     color : rl.Color
 }
 
+Sprite :: struct {
+    using center : [2]i32,
+    hidden : bool,
+    texture : rl.Texture
+}
+
 Line :: struct {
     p1 : [2]i32,
     p2 : [2]i32,
@@ -32,6 +38,20 @@ collide :: proc(p : [2]i32, area : Rectangle) -> bool
         p.x <= area.x + area.w &&
         p.y >= area.y &&
         p.y <= area.y + area.h
+}
+
+render_sprite :: proc(sprite : Sprite)
+{
+    if sprite.hidden do return
+
+    origin := [2]i32{ sprite.texture.width / 2, sprite.texture.height }
+
+    rl.DrawTexture(
+        sprite.texture,
+        sprite.x - origin.x,
+        sprite.y - origin.y,
+        rl.WHITE
+    )
 }
 
 render_square :: proc(square : Square)
