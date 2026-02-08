@@ -102,7 +102,7 @@ main :: proc()
 
         label := Label{
             text = text,
-            center = barycenter,
+            position = barycenter,
             color = FACE_LABEL_COLOR,
             font_height = 14
         }
@@ -143,7 +143,7 @@ main :: proc()
     }
 
     dead_label := Label{
-        center = {
+        position = {
             i32(300),
             i32(150),
         },
@@ -154,7 +154,7 @@ main :: proc()
     }
 
     win_label := Label{
-        center = {
+        position = {
             i32(300),
             i32(150),
         },
@@ -167,9 +167,25 @@ main :: proc()
     TIME : f32 = 60
     time : f32 = 0
 
-    time_label := Label{
-        center = { 35, 290 },
+    seconds_label := Label{
+        position = { 50, 290 },
         color = WEB_COLOR_SAFE,
+        align = .RIGHT,
+        font_height = 20
+    }
+
+    centiseconds_label := Label{
+        position = { 60, 290 },
+        color = WEB_COLOR_SAFE,
+        align = .LEFT,
+        font_height = 20
+    }
+
+    timer_decimal_point := Label{
+        position = { 55, 290 },
+        color = WEB_COLOR_SAFE,
+        align = .CENTER,
+        text = ".",
         font_height = 20
     }
 
@@ -204,8 +220,16 @@ main :: proc()
         //
 
         time_left := TIME - time
-        text := fmt.aprintf("%02.2f", time_left, allocator=context.temp_allocator)
-        time_label.text = strings.clone_to_cstring(text, context.temp_allocator)
+
+        {
+            text := fmt.aprintf("%02d", i32(time_left), allocator=context.temp_allocator)
+            seconds_label.text = strings.clone_to_cstring(text, context.temp_allocator)
+        }
+
+        {
+            text := fmt.aprintf("%.2f", time_left - f32(i32(time_left)), allocator=context.temp_allocator)
+            centiseconds_label.text = strings.clone_to_cstring(text[2:], context.temp_allocator)
+        }
 
         if time_left <= 0
         {
@@ -262,7 +286,9 @@ main :: proc()
                 goal.hidden = false
                 dead_label.hidden = true
                 win_label.hidden = true
-                time_label.hidden = false
+                seconds_label.hidden = false
+                centiseconds_label.hidden = false
+                timer_decimal_point.hidden = false
 
                 for &sprite in bad_nodes
                 {
@@ -311,7 +337,9 @@ main :: proc()
             else do win_label.hidden = false
 
             player.hidden = true
-            time_label.hidden = true
+            seconds_label.hidden = true
+            centiseconds_label.hidden = true
+            timer_decimal_point.hidden = true
 
             goal.hidden = true
             for &sprite in bad_nodes do sprite.hidden = true
@@ -368,7 +396,9 @@ main :: proc()
         
         render_label(win_label)
         
-        render_label(time_label)
+        render_label(seconds_label)
+        render_label(centiseconds_label)
+        render_label(timer_decimal_point)
 
         rl.EndTextureMode()
 

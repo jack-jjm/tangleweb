@@ -24,10 +24,11 @@ Line :: struct {
 }
 
 Label :: struct {
-    center : [2]i32,
+    position : [2]i32,
     font_height : i32,
     text : cstring,
     color : rl.Color,
+    align : enum { CENTER, LEFT, RIGHT },
     hidden : bool
 }
 
@@ -135,8 +136,22 @@ render_label :: proc(label : Label)
 
     width := rl.MeasureText(label.text, label.font_height)
 
-    x := label.center.x - width / 2
-    y := label.center.y - label.font_height / 2
+    x_offset : i32
+    switch label.align
+    {
+        case .LEFT:
+            x_offset = 0
+
+        case .CENTER:
+            x_offset = width / 2
+
+        case .RIGHT:
+            x_offset = width
+
+    }
+
+    x := label.position.x - x_offset
+    y := label.position.y - label.font_height / 2
 
     rl.DrawText(
         label.text, x, y, label.font_height, label.color
