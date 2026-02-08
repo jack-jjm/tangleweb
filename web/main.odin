@@ -89,9 +89,7 @@ main :: proc()
         }
         barycenter = barycenter / i32(2 * len(face.edges))
 
-        formatted := fmt.aprintf("%d", face.count)
-        defer delete(formatted)
-
+        formatted := fmt.aprintf("%d", face.count, allocator=context.temp_allocator)
         text := strings.clone_to_cstring(formatted)
 
         label := Label{
@@ -123,6 +121,15 @@ main :: proc()
         font_height = 200
     }
 
+    TIME : f32 = 120
+    time : f32 = 0
+
+    time_label := Label{
+        center = { 35, 290 },
+        color = WEB_COLOR_SAFE,
+        font_height = 20
+    }
+
     texture := rl.LoadRenderTexture(600, 300)
 
     for !rl.WindowShouldClose()
@@ -149,6 +156,17 @@ main :: proc()
         mouse : [2]i32 = {
             i32(f32(screen_mouse.x - x) / scale),
             i32(f32(screen_mouse.y - y) / scale)
+        }
+
+        //
+
+        time_left := TIME - time
+        text := fmt.aprintf("%02.2f", time_left, allocator=context.temp_allocator)
+        time_label.text = strings.clone_to_cstring(text, context.temp_allocator)
+
+        if time_left <= 0
+        {
+            dead = true
         }
 
         if !dead
@@ -188,9 +206,10 @@ main :: proc()
             {
                 dead = false
                 current_node = 0
-
+                
                 player.hidden = false
                 dead_label.hidden = true
+                time_label.hidden = false
 
                 for &label in face_labels
                 {
@@ -228,6 +247,7 @@ main :: proc()
         {
             player.hidden = true
             dead_label.hidden = false
+            time_label.hidden = true
             
             for &button in node_buttons
             {
@@ -271,6 +291,8 @@ main :: proc()
         render_sprite(player)
 
         render_label(dead_label)
+        
+        render_label(time_label)
 
         rl.EndTextureMode()
 
@@ -286,5 +308,9 @@ main :: proc()
         )
 
         rl.EndDrawing()
+    
+        time += 1 / 60.
+
+        free_all(context.temp_allocator)
     }
 }
