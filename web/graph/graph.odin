@@ -93,10 +93,11 @@ circular_walk :: proc(graph : Graph, current_node_index, last_edge_index : int) 
     return
 }
 
-find_faces :: proc(graph : ^Graph)
+find_faces :: proc(graph : ^Graph) -> int
 {
     biggest_face_index : int
     biggest_face_area : f32 = 0
+    n_zero_faces := 0
 
     for _, start_node_id in graph.nodes
     {
@@ -148,6 +149,11 @@ find_faces :: proc(graph : ^Graph)
             {
                 append(&graph.faces, face)
 
+                if face.count == 0
+                {
+                    n_zero_faces += 1
+                }
+
                 if area > biggest_face_area
                 {
                     biggest_face_index = len(graph.faces) - 1
@@ -160,6 +166,8 @@ find_faces :: proc(graph : ^Graph)
     }
 
     unordered_remove(&graph.faces, biggest_face_index)
+
+    return n_zero_faces
 }
 
 mutate_path :: proc(graph : ^Graph) -> bool
@@ -448,48 +456,63 @@ generate_graph :: proc(graph : ^Graph)
             return false
         }
 
-        solution := find_path(graph^, 0, 3, solution_conditions)
-        
-        if !solution.success
+        n_attempts_to_find_path := 0
+        for n_attempts_to_find_path < 10
         {
-            destroy(graph)
-            continue
-        }
-        
-        for node_id, edge_id in iter_path(&solution)
-        {
-            if edge_id == nil do break
+            solution := find_path(graph^, 0, 3, solution_conditions)
             
-            graph.edges[edge_id.(int)].protected = true
-            // graph.edges[edge_id.(int)].safety = .SAFE
-        }
-
-        path := find_path(graph^, 1, 2 , lethal_path_conditions)
-
-        if !path.success
-        {
-            destroy(graph)
-            continue
-        }
-
-        for node_id, edge_id in iter_path(&path)
-        {
-            graph.nodes[node_id].on_path = true
-            if edge_id != nil
+            if !solution.success
             {
-                graph.edges[edge_id.(int)].lethal = true
+                break
             }
+            
+            for node_id, edge_id in iter_path(&solution)
+            {
+                if edge_id == nil do break
+                
+                graph.edges[edge_id.(int)].protected = true
+                // graph.edges[edge_id.(int)].safety = .SAFE
+            }
+
+            path := find_path(graph^, 1, 2 , lethal_path_conditions)
+
+            if !path.success
+            {
+                break
+            }
+
+            for node_id, edge_id in iter_path(&path)
+            {
+                graph.nodes[node_id].on_path = true
+                if edge_id != nil
+                {
+                    graph.edges[edge_id.(int)].lethal = true
+                }
+            }
+
+            failed := false
+            for !failed
+            {
+                failed = !mutate_path(graph)
+            }
+
+            n_zero_faces := find_faces(graph)
+            if n_zero_faces * 4 < len(graph.faces)
+            {
+                return
+            }
+
+            for &edge, edge_id in graph.edges
+            {
+                edge.lethal = false
+                edge.protected = false
+            }
+
+            n_attempts_to_find_path += 1
         }
 
-        failed := false
-        for !failed
-        {
-            failed = !mutate_path(graph)
-        }
-
-        find_faces(graph)
-
-        return
+        destroy(graph)
+        continue
     }
 }
 
