@@ -11,6 +11,7 @@ Square :: struct {
 
 Sprite :: struct {
     using center : [2]i32,
+    registration : [2]i32,
     hidden : bool,
     texture : rl.Texture
 }
@@ -44,7 +45,10 @@ render_sprite :: proc(sprite : Sprite)
 {
     if sprite.hidden do return
 
-    origin := [2]i32{ sprite.texture.width / 2, sprite.texture.height }
+    origin := [2]i32{
+        sprite.texture.width / 2 + sprite.registration[0] * sprite.texture.width / 2,
+        sprite.texture.height / 2 + sprite.registration[1] * sprite.texture.height / 2
+    }
 
     rl.DrawTexture(
         sprite.texture,

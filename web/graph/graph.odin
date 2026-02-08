@@ -553,6 +553,12 @@ generate_graph :: proc(graph : ^Graph)
 
         find_faces(graph)
 
+        iterator := Neighbors{ graph=graph^, source=0 }
+        for node_id, edge_id in neighbors(&iterator)
+        {
+            declare_safe(graph^, edge_id)
+        }
+
         return
     }
 }

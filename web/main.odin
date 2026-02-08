@@ -9,6 +9,8 @@ import "./graph"
 import "./window"
 
 girl_sprite_data := #load("../graphics/girl.png")
+goal_sprite_data := #load("../graphics/goal.png")
+bad_sprite_data := #load("../graphics/bad.png")
 
 NodeButton :: struct {
     using box : Rectangle,
@@ -17,9 +19,11 @@ NodeButton :: struct {
 }
 
 node_buttons : [dynamic]NodeButton
+bad_nodes : [dynamic]Sprite
 web_lines : [dynamic]Line
 face_labels : [dynamic]Label
 player : Sprite
+goal : Sprite
 
 WEB_COLOR_DEFAULT : rl.Color = { 80, 103, 91, 255 }
 WEB_COLOR_DEADLY  : rl.Color = { 181, 53, 61, 255 }
@@ -48,6 +52,7 @@ main :: proc()
 
     current_node := 0
     dead := false
+    win := false
 
     for n, n_id in g.nodes
     {
@@ -105,9 +110,33 @@ main :: proc()
     girl_image := rl.LoadImageFromMemory(".png", raw_data(girl_sprite_data), cast(i32) len(girl_sprite_data))
     girl_texture := rl.LoadTextureFromImage(girl_image)
 
+    goal_image := rl.LoadImageFromMemory(".png", raw_data(goal_sprite_data), cast(i32) len(goal_sprite_data))
+    goal_texture := rl.LoadTextureFromImage(goal_image)
+
+    bad_image := rl.LoadImageFromMemory(".png", raw_data(bad_sprite_data), cast(i32) len(bad_sprite_data))
+    bad_texture := rl.LoadTextureFromImage(bad_image)
+
+    start_and_end := [2]int{ 1, 2 }
+    for node_id in start_and_end
+    {
+        sprite := Sprite{
+            center = g.nodes[node_id],
+            registration = { 0, 0 },
+            texture = bad_texture
+        }
+        append(&bad_nodes, sprite)
+    }
+
     player = Sprite{
         center = g.nodes[0],
+        registration = { 0, 1 },
         texture = girl_texture
+    }
+
+    goal = Sprite{
+        center = g.nodes[3],
+        registration = { 0, 0 },
+        texture = goal_texture
     }
 
     dead_label := Label{
@@ -121,7 +150,18 @@ main :: proc()
         font_height = 200
     }
 
-    TIME : f32 = 120
+    win_label := Label{
+        center = {
+            i32(300),
+            i32(150),
+        },
+        text = "SAVED",
+        color = rl.GREEN,
+        hidden = true,
+        font_height = 150
+    }
+
+    TIME : f32 = 60
     time : f32 = 0
 
     time_label := Label{
@@ -169,7 +209,7 @@ main :: proc()
             dead = true
         }
 
-        if !dead
+        if !dead && !win
         {
             for &button in node_buttons
             {
@@ -194,6 +234,11 @@ main :: proc()
                             {
                                 current_node = button.node_id                                
                                 graph.declare_safe(g, edge_id)
+
+                                if button.node_id == 3
+                                {
+                                    win = true
+                                }
                             }
                         }
                     }
@@ -206,10 +251,18 @@ main :: proc()
             {
                 dead = false
                 current_node = 0
+                time = 0
                 
                 player.hidden = false
+                goal.hidden = false
                 dead_label.hidden = true
+                win_label.hidden = true
                 time_label.hidden = false
+
+                for &sprite in bad_nodes
+                {
+                    sprite.hidden = false
+                }
 
                 for &label in face_labels
                 {
@@ -220,7 +273,7 @@ main :: proc()
             }
         }
 
-        if !dead do for edge, edge_id in g.edges
+        if !dead && !win do for edge, edge_id in g.edges
         {
             line := &web_lines[edge_id]
             if !rl.IsKeyDown(rl.KeyboardKey.C) do switch edge.safety
@@ -245,9 +298,18 @@ main :: proc()
         }
         else
         {
+            color : rl.Color
+            if dead do color = rl.RED
+            else do color = rl.GREEN
+
+            if dead do dead_label.hidden = false
+            else do win_label.hidden = false
+
             player.hidden = true
-            dead_label.hidden = false
             time_label.hidden = true
+
+            goal.hidden = true
+            for &sprite in bad_nodes do sprite.hidden = true
             
             for &button in node_buttons
             {
@@ -256,12 +318,12 @@ main :: proc()
 
             for &line in web_lines
             {
-                line.color = rl.RED
+                line.color = color
             }
 
             for &label in face_labels
             {
-                label.color = rl.RED
+                label.color = color
             }
         }
 
@@ -283,14 +345,23 @@ main :: proc()
             render_square(button.sprite)
         }
 
+        for sprite in bad_nodes
+        {
+            render_sprite(sprite)
+        }
+
         for label in face_labels
         {
             render_label(label)
         }
 
-        render_sprite(player)
+        render_sprite(goal)
+        
+        render_sprite(player)        
 
         render_label(dead_label)
+        
+        render_label(win_label)
         
         render_label(time_label)
 
