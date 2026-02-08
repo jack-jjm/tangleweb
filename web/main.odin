@@ -49,7 +49,8 @@ main :: proc()
             sprite = Square{
                 x = i32(n.x), y = i32(n.y),
                 size = 8,
-                color = rl.WHITE
+                color = rl.WHITE,
+                hidden = true
             }
         }
 
@@ -144,7 +145,7 @@ main :: proc()
         {
             for &button in node_buttons
             {
-                button.sprite.color = rl.BLACK
+                button.sprite.hidden = true
 
                 if collide(mouse, button)
                 {
@@ -152,7 +153,7 @@ main :: proc()
 
                     if legal
                     {
-                        button.sprite.color = rl.WHITE
+                        button.sprite.hidden = false
 
                         if rl.IsMouseButtonPressed(.LEFT)
                         {
@@ -163,48 +164,11 @@ main :: proc()
                             }
                             else
                             {
-                                current_node = button.node_id
-                                player.center = g.nodes[current_node].position
+                                current_node = button.node_id                                
                                 graph.declare_safe(g, edge_id)
                             }
                         }
                     }
-                }
-            }
-
-            if !dead do for edge, edge_id in g.edges
-            {
-                line := &web_lines[edge_id]
-                switch edge.safety
-                {
-                    case .UNKNOWN:
-                        line.color = rl.WHITE
-                    
-                    case .SAFE:
-                        line.color = rl.GREEN
-
-                    case .UNSAFE:
-                        line.color = rl.RED
-                }
-            }
-            else
-            {
-                player.hidden = true
-                dead_label.hidden = false
-                
-                for &button in node_buttons
-                {
-                    button.sprite.hidden = true
-                }
-
-                for &line in web_lines
-                {
-                    line.color = rl.RED
-                }
-
-                for &label in face_labels
-                {
-                    label.color = rl.RED
                 }
             }
         }
@@ -214,7 +178,6 @@ main :: proc()
             {
                 dead = false
                 current_node = 0
-                player.center = g.nodes[current_node].position
 
                 player.hidden = false
                 dead_label.hidden = true
@@ -233,20 +196,58 @@ main :: proc()
             }
         }
 
+        if !dead do for edge, edge_id in g.edges
+        {
+            line := &web_lines[edge_id]
+            switch edge.safety
+            {
+                case .UNKNOWN:
+                    line.color = rl.WHITE
+                
+                case .SAFE:
+                    line.color = rl.GREEN
+
+                case .UNSAFE:
+                    line.color = rl.RED
+            }
+        }
+        else
+        {
+            player.hidden = true
+            dead_label.hidden = false
+            
+            for &button in node_buttons
+            {
+                button.sprite.hidden = true
+            }
+
+            for &line in web_lines
+            {
+                line.color = rl.RED
+            }
+
+            for &label in face_labels
+            {
+                label.color = rl.RED
+            }
+        }
+
+        player.center = g.nodes[current_node].position
+
         rl.BeginDrawing()
 
         rl.BeginTextureMode(texture)
 
         rl.ClearBackground(rl.BLACK)
+        
+        for line in web_lines
+        {
+            render_line(line)
+        }
 
         for button in node_buttons
         {
             render_square(button.sprite)
-        }
-
-        for line in web_lines
-        {
-            render_line(line)
         }
 
         for label in face_labels
