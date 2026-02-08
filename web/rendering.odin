@@ -45,9 +45,31 @@ render_square :: proc(square : Square)
 
 render_line :: proc(line : Line)
 {
-    using line
+    p1 := line.p1
+    p2 := line.p2
+
+    u := p2 - p1
+    normal := [2]i32{ u.y, -u.x }
+
+    d1 : [2]i32
+    d2 : [2]i32
+
+    if abs(u.x) > abs(u.y)
+    {
+        d1 = [2]i32{ 0, 1 }
+        d2 = [2]i32{ 0, -1 }
+    }
+    else
+    {
+        d1 = [2]i32{ 1, 0 }
+        d2 = [2]i32{ -1, 0 }
+    }
+
     rl.DrawLine(
-        p1.x, p1.y, p2.x, p2.y, color
+        p1.x + d1.x, p1.y + d1.y, p2.x + d1.x, p2.y + d1.y, line.color
+    )
+    rl.DrawLine(
+        p1.x + d2.x, p1.y + d2.y, p2.x + d2.x, p2.y + d2.y, line.color
     )
 }
 

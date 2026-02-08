@@ -19,6 +19,12 @@ web_lines : [dynamic]Line
 face_labels : [dynamic]Label
 player : Square
 
+WEB_COLOR_DEFAULT : rl.Color = { 80, 103, 91, 255 }
+WEB_COLOR_DEADLY  : rl.Color = { 131, 53, 61, 255 }
+WEB_COLOR_SAFE    : rl.Color = { 223, 229, 233, 255 }
+
+FACE_LABEL_COLOR := WEB_COLOR_SAFE
+
 main :: proc()
 {
     seed := rand.uint64()
@@ -89,8 +95,8 @@ main :: proc()
         label := Label{
             text = text,
             center = barycenter,
-            color = rl.WHITE,
-            font_height = 11
+            color = FACE_LABEL_COLOR,
+            font_height = 14
         }
 
         append(&face_labels, label)
@@ -189,7 +195,7 @@ main :: proc()
 
                 for &label in face_labels
                 {
-                    label.color = rl.WHITE
+                    label.color = FACE_LABEL_COLOR
                 }
 
                 graph.reset_solver(g)
@@ -202,13 +208,13 @@ main :: proc()
             switch edge.safety
             {
                 case .UNKNOWN:
-                    line.color = rl.WHITE
+                    line.color = WEB_COLOR_DEFAULT
                 
                 case .SAFE:
-                    line.color = rl.GREEN
+                    line.color = WEB_COLOR_SAFE
 
                 case .UNSAFE:
-                    line.color = rl.RED
+                    line.color = WEB_COLOR_DEADLY
             }
         }
         else
