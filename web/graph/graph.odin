@@ -567,6 +567,14 @@ adjacent :: proc(graph : Graph, a, b : int) -> (bool, int)
     return false, 0
 }
 
+reset_solver :: proc(graph : Graph)
+{
+    for &edge in graph.edges
+    {
+        edge.safety = .UNKNOWN
+    }
+}
+
 declare_safe :: proc(graph : Graph, safe_edge_id : int)
 {
     graph.edges[safe_edge_id].safety = .SAFE

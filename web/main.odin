@@ -7,7 +7,17 @@ import "core:math/rand"
 
 import "./graph"
 import "./window"
-import r "./rendering"
+
+NodeButton :: struct {
+    using box : Rectangle,
+    node_id : int,
+    sprite : Square
+}
+
+node_buttons : [dynamic]NodeButton
+web_lines : [dynamic]Line
+face_labels : [dynamic]Label
+player : Square
 
 main :: proc()
 {
@@ -33,31 +43,29 @@ main :: proc()
 
     for n, n_id in g.nodes
     {
-        square := r.Square{
-            x = i32(n.x), y = i32(n.y),
-            size = 8,
-            color = rl.WHITE
-        }
-        entity_id := r.add(square)
-
-        click_area := r.ClickArea{
+        button := NodeButton{
             box = { x = i32(n.x - 4), y = i32(n.y - 4), w = 8, h = 8 },
             node_id = n_id,
-            entity_id = entity_id
+            sprite = Square{
+                x = i32(n.x), y = i32(n.y),
+                size = 8,
+                color = rl.WHITE
+            }
         }
 
-        r.add_click_area(click_area)
+        append(&node_buttons, button)
     }
 
     for e in g.edges
     {
         a, b := e.endpoints[0], e.endpoints[1]
-        line := r.Line{
+        line := Line{
             p1 = g.nodes[a],
             p2 = g.nodes[b],
             color = rl.WHITE
         }
-        r.add(line)
+
+        append(&web_lines, line)
     }
 
     for face in g.faces
@@ -77,16 +85,32 @@ main :: proc()
 
         text := strings.clone_to_cstring(formatted)
 
-        label := r.Label{
+        label := Label{
             text = text,
             center = barycenter,
             color = rl.WHITE,
             font_height = 11
         }
-        r.add(label)
+
+        append(&face_labels, label)
     }
 
-    player_id := r.add(r.Square{ center = g.nodes[0], size = 15, color = rl.ORANGE })
+    player = Square{
+        center = g.nodes[0],
+        size = 15,
+        color = rl.ORANGE
+    }
+
+    dead_label := Label{
+        center = {
+            i32(300),
+            i32(150),
+        },
+        text = "DEAD",
+        color = rl.RED,
+        hidden = true,
+        font_height = 200
+    }
 
     texture := rl.LoadRenderTexture(600, 300)
 
@@ -118,37 +142,69 @@ main :: proc()
 
         if !dead
         {
-            for click_area in r.click_areas
+            for &button in node_buttons
             {
-                entity := r.get_entity(click_area.entity_id)
-                square := cast(^r.Square) entity
-                square.color = rl.BLACK
+                button.sprite.color = rl.BLACK
 
-                if r.collide(mouse, click_area)
+                if collide(mouse, button)
                 {
-                    legal, edge_id := graph.adjacent(g, current_node, click_area.node_id)
+                    legal, edge_id := graph.adjacent(g, current_node, button.node_id)
 
                     if legal
                     {
-                        square.color = rl.WHITE
+                        button.sprite.color = rl.WHITE
 
                         if rl.IsMouseButtonPressed(.LEFT)
                         {
                             if g.edges[edge_id].lethal
                             {
                                 dead = true
-                                fmt.println("dead")
+                                break
                             }
                             else
                             {
-                                current_node = click_area.node_id
-                                e := r.get_entity(player_id)
-                                s := cast(^r.Square) e
-                                s.x = cast(i32) g.nodes[current_node].x
-                                s.y = cast(i32) g.nodes[current_node].y
+                                current_node = button.node_id
+                                player.center = g.nodes[current_node].position
+                                graph.declare_safe(g, edge_id)
                             }
                         }
                     }
+                }
+            }
+
+            if !dead do for edge, edge_id in g.edges
+            {
+                line := &web_lines[edge_id]
+                switch edge.safety
+                {
+                    case .UNKNOWN:
+                        line.color = rl.WHITE
+                    
+                    case .SAFE:
+                        line.color = rl.GREEN
+
+                    case .UNSAFE:
+                        line.color = rl.RED
+                }
+            }
+            else
+            {
+                player.hidden = true
+                dead_label.hidden = false
+                
+                for &button in node_buttons
+                {
+                    button.sprite.hidden = true
+                }
+
+                for &line in web_lines
+                {
+                    line.color = rl.RED
+                }
+
+                for &label in face_labels
+                {
+                    label.color = rl.RED
                 }
             }
         }
@@ -158,6 +214,22 @@ main :: proc()
             {
                 dead = false
                 current_node = 0
+                player.center = g.nodes[current_node].position
+
+                player.hidden = false
+                dead_label.hidden = true
+
+                for &button in node_buttons
+                {
+                    button.sprite.hidden = false
+                }
+
+                for &label in face_labels
+                {
+                    label.color = rl.WHITE
+                }
+
+                graph.reset_solver(g)
             }
         }
 
@@ -167,10 +239,24 @@ main :: proc()
 
         rl.ClearBackground(rl.BLACK)
 
-        for e in r.entities
+        for button in node_buttons
         {
-            r.render(e)
+            render_square(button.sprite)
         }
+
+        for line in web_lines
+        {
+            render_line(line)
+        }
+
+        for label in face_labels
+        {
+            render_label(label)
+        }
+
+        render_square(player)
+
+        render_label(dead_label)
 
         rl.EndTextureMode()
 
