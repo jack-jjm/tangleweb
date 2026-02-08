@@ -1,7 +1,7 @@
 - fix timer rendering
-- add end state
-- add goal and bad node sprites
 
 - try interval timer
+
+- add fog of war
 
 - start working on puzzle generation

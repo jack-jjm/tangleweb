@@ -19,6 +19,7 @@ Sprite :: struct {
 Line :: struct {
     p1 : [2]i32,
     p2 : [2]i32,
+    sag : i32,
     color : rl.Color
 }
 
@@ -73,7 +74,6 @@ render_line :: proc(line : Line)
     p2 := line.p2
 
     u := p2 - p1
-    normal := [2]i32{ u.y, -u.x }
 
     d1 : [2]i32
     d2 : [2]i32
@@ -89,12 +89,44 @@ render_line :: proc(line : Line)
         d2 = [2]i32{ -1, 0 }
     }
 
-    rl.DrawLine(
-        p1.x + d1.x, p1.y + d1.y, p2.x + d1.x, p2.y + d1.y, line.color
-    )
-    rl.DrawLine(
-        p1.x + d2.x, p1.y + d2.y, p2.x + d2.x, p2.y + d2.y, line.color
-    )
+    if line.sag == 0 || line.p1.x == line.p2.x
+    {
+
+        rl.DrawLine(
+            p1.x + d1.x, p1.y + d1.y, p2.x + d1.x, p2.y + d1.y, line.color
+        )
+
+        rl.DrawLine(
+            p1.x + d2.x, p1.y + d2.y, p2.x + d2.x, p2.y + d2.y, line.color
+        )
+    }
+    else
+    {
+        x1 := p1.x
+        x2 := p2.x
+        y1 := p1.y
+        y2 := p2.y
+
+        a := f32(x1 - x2) / 2
+        a = a * a
+        a = -f32(line.sag) / a
+
+        dx : i32 = +1 if x2 > x1 else -1
+
+        slope := f32(y2 - y1) / f32(x2 - x1)
+        previous := p1
+        for x := x1; x != x2 + dx; x += dx
+        {
+            y := f32(y1)
+            y += f32(x - x1) * slope
+            y += a * f32((x - x1) * (x - x2))
+
+            rl.DrawLine(previous.x, previous.y - 1, x, i32(y - 1), line.color)
+            rl.DrawLine(previous.x, previous.y + 1, x, i32(y + 1), line.color)
+
+            previous = { x, i32(y) }
+        }
+    }
 }
 
 render_label :: proc(label : Label)

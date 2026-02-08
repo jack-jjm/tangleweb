@@ -78,6 +78,7 @@ main :: proc()
         line := Line{
             p1 = g.nodes[a],
             p2 = g.nodes[b],
+            sag = 2,
             color = rl.WHITE
         }
 
@@ -236,6 +237,8 @@ main :: proc()
                             {
                                 current_node = button.node_id                                
                                 graph.declare_safe(solver, edge_id)
+
+                                web_lines[edge_id].sag = 10
 
                                 if button.node_id == 3
                                 {
