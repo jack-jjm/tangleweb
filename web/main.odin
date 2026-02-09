@@ -25,6 +25,12 @@ face_labels : [dynamic]Label
 player : Sprite
 goal : Sprite
 
+dead_label : Label
+win_label : Label
+seconds_label : Label
+centiseconds_label : Label
+timer_decimal_point : Label
+
 WEB_COLOR_DEFAULT : rl.Color = { 80, 103, 91, 255 }
 WEB_COLOR_DEADLY  : rl.Color = { 181, 53, 61, 255 }
 WEB_COLOR_SAFE    : rl.Color = { 223, 229, 233, 255 }
@@ -46,70 +52,6 @@ main :: proc()
     rl.SetWindowState({ .WINDOW_RESIZABLE })
     rl.SetTargetFPS(60)
 
-    g := graph.Graph{ x = 15, y = 10, width = 600 - 30, height = 300 - 20 }
-
-    graph.generate_graph(&g)
-    
-    solver := graph.init_solver(&g)
-
-    current_node := 0
-    dead := false
-    win := false
-
-    for n, n_id in g.nodes
-    {
-        button := NodeButton{
-            box = { x = i32(n.x - 4), y = i32(n.y - 4), w = 8, h = 8 },
-            node_id = n_id,
-            sprite = Square{
-                x = i32(n.x), y = i32(n.y),
-                size = 8,
-                color = rl.WHITE,
-                hidden = true
-            }
-        }
-
-        append(&node_buttons, button)
-    }
-
-    for e in g.edges
-    {
-        a, b := e.endpoints[0], e.endpoints[1]
-        line := Line{
-            p1 = g.nodes[a],
-            p2 = g.nodes[b],
-            sag = 2,
-            color = rl.WHITE
-        }
-
-        append(&web_lines, line)
-    }
-
-    for face in g.faces
-    {
-        barycenter : [2]i32
-        for e in face.edges
-        {
-            a := g.nodes[g.edges[e].endpoints[0]]
-            b := g.nodes[g.edges[e].endpoints[1]]
-            barycenter += a
-            barycenter += b
-        }
-        barycenter = barycenter / i32(2 * len(face.edges))
-
-        formatted := fmt.aprintf("%d", face.count, allocator=context.temp_allocator)
-        text := strings.clone_to_cstring(formatted)
-
-        label := Label{
-            text = text,
-            position = barycenter,
-            color = FACE_LABEL_COLOR,
-            font_height = 14
-        }
-
-        append(&face_labels, label)
-    }
-
     girl_image := rl.LoadImageFromMemory(".png", raw_data(girl_sprite_data), cast(i32) len(girl_sprite_data))
     girl_texture := rl.LoadTextureFromImage(girl_image)
 
@@ -119,77 +61,18 @@ main :: proc()
     bad_image := rl.LoadImageFromMemory(".png", raw_data(bad_sprite_data), cast(i32) len(bad_sprite_data))
     bad_texture := rl.LoadTextureFromImage(bad_image)
 
-    start_and_end := [2]int{ 1, 2 }
-    for node_id in start_and_end
-    {
-        sprite := Sprite{
-            center = g.nodes[node_id],
-            registration = { 0, 0 },
-            texture = bad_texture
-        }
-        append(&bad_nodes, sprite)
-    }
-
-    player = Sprite{
-        center = g.nodes[0],
-        registration = { 0, 1 },
-        texture = girl_texture
-    }
-
-    goal = Sprite{
-        center = g.nodes[3],
-        registration = { 0, 0 },
-        texture = goal_texture
-    }
-
-    dead_label := Label{
-        position = {
-            i32(300),
-            i32(150),
-        },
-        text = "DEAD",
-        color = rl.RED,
-        hidden = true,
-        font_height = 200
-    }
-
-    win_label := Label{
-        position = {
-            i32(300),
-            i32(150),
-        },
-        text = "SAVED",
-        color = rl.GREEN,
-        hidden = true,
-        font_height = 150
-    }
-
     TIME : f32 = 60
-    time : f32 = 0
+    time : f32
+    current_node : int
+    dead : bool
+    win : bool
 
-    seconds_label := Label{
-        position = { 50, 290 },
-        color = WEB_COLOR_SAFE,
-        align = .RIGHT,
-        font_height = 20
-    }
-
-    centiseconds_label := Label{
-        position = { 60, 290 },
-        color = WEB_COLOR_SAFE,
-        align = .LEFT,
-        font_height = 20
-    }
-
-    timer_decimal_point := Label{
-        position = { 55, 290 },
-        color = WEB_COLOR_SAFE,
-        align = .CENTER,
-        text = ".",
-        font_height = 20
-    }
+    g : graph.Graph
+    solver : graph.Solver
 
     texture := rl.LoadRenderTexture(600, 300)
+
+    requires_initialization := true
 
     for !rl.WindowShouldClose()
     {
@@ -218,6 +101,154 @@ main :: proc()
         }
 
         //
+
+        if rl.IsKeyPressed(rl.KeyboardKey.N)
+        {
+            graph.destroy(&g)
+            delete(solver.edges)
+
+            clear(&node_buttons)
+            clear(&web_lines)
+            clear(&face_labels)
+            clear(&bad_nodes)
+
+            requires_initialization = true
+        }
+
+        if requires_initialization
+        {
+            requires_initialization = false
+
+            time = 0
+            current_node = 0
+            dead = false
+            win = false
+
+            g = graph.Graph{ x = 15, y = 10, width = 600 - 30, height = 300 - 20 }
+            graph.generate_graph(&g)    
+            solver = graph.init_solver(&g)
+
+            for n, n_id in g.nodes
+            {
+                button := NodeButton{
+                    box = { x = i32(n.x - 4), y = i32(n.y - 4), w = 8, h = 8 },
+                    node_id = n_id,
+                    sprite = Square{
+                        x = i32(n.x), y = i32(n.y),
+                        size = 8,
+                        color = rl.WHITE,
+                        hidden = true
+                    }
+                }
+
+                append(&node_buttons, button)
+            }
+
+            for e in g.edges
+            {
+                a, b := e.endpoints[0], e.endpoints[1]
+                line := Line{
+                    p1 = g.nodes[a],
+                    p2 = g.nodes[b],
+                    sag = 2,
+                    color = rl.WHITE
+                }
+
+                append(&web_lines, line)
+            }
+
+            for face in g.faces
+            {
+                barycenter : [2]i32
+                for e in face.edges
+                {
+                    a := g.nodes[g.edges[e].endpoints[0]]
+                    b := g.nodes[g.edges[e].endpoints[1]]
+                    barycenter += a
+                    barycenter += b
+                }
+                barycenter = barycenter / i32(2 * len(face.edges))
+
+                formatted := fmt.aprintf("%d", face.count, allocator=context.temp_allocator)
+                text := strings.clone_to_cstring(formatted)
+
+                label := Label{
+                    text = text,
+                    position = barycenter,
+                    color = FACE_LABEL_COLOR,
+                    font_height = 14
+                }
+
+                append(&face_labels, label)
+            }
+
+            start_and_end := [2]int{ 1, 2 }
+            for node_id in start_and_end
+            {
+                sprite := Sprite{
+                    center = g.nodes[node_id],
+                    registration = { 0, 0 },
+                    texture = bad_texture
+                }
+                append(&bad_nodes, sprite)
+            }
+
+            player = Sprite{
+                center = g.nodes[0],
+                registration = { 0, 1 },
+                texture = girl_texture
+            }
+
+            goal = Sprite{
+                center = g.nodes[3],
+                registration = { 0, 0 },
+                texture = goal_texture
+            }
+
+            dead_label = Label{
+                position = {
+                    i32(300),
+                    i32(150),
+                },
+                text = "DEAD",
+                color = rl.RED,
+                hidden = true,
+                font_height = 200
+            }
+
+            win_label = Label{
+                position = {
+                    i32(300),
+                    i32(150),
+                },
+                text = "SAVED",
+                color = rl.GREEN,
+                hidden = true,
+                font_height = 150
+            }
+
+            seconds_label = Label{
+                position = { 50, 290 },
+                color = WEB_COLOR_SAFE,
+                align = .RIGHT,
+                font_height = 20
+            }
+
+            centiseconds_label = Label{
+                position = { 60, 290 },
+                color = WEB_COLOR_SAFE,
+                align = .LEFT,
+                font_height = 20
+            }
+
+            timer_decimal_point = Label{
+                position = { 55, 290 },
+                color = WEB_COLOR_SAFE,
+                align = .CENTER,
+                text = ".",
+                font_height = 20
+            }
+        }
 
         time_left := TIME - time
 
