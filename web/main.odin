@@ -262,7 +262,7 @@ main :: proc()
             centiseconds_label.text = strings.clone_to_cstring(text[2:], context.temp_allocator)
         }
 
-        if time_left <= 0
+        if time_left <= 0 && !win
         {
             dead = true
         }
