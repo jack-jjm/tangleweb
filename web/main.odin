@@ -37,6 +37,14 @@ WEB_COLOR_SAFE    : rl.Color = { 223, 229, 233, 255 }
 
 FACE_LABEL_COLOR := WEB_COLOR_SAFE
 
+float :: proc(v : [2]i32) -> [2]f32
+{
+    return {
+        cast(f32) v.x,
+        cast(f32) v.y
+    }
+}
+
 format :: proc(fstring : string, args : ..any) -> cstring
 {
     text := fmt.aprintf(fstring, ..args, allocator=context.temp_allocator)
@@ -202,7 +210,7 @@ main :: proc()
             for node_id in start_and_end
             {
                 sprite := Sprite{
-                    center = g.nodes[node_id],
+                    center = float(g.nodes[node_id]),
                     registration = { 0, 0 },
                     sheet = bad_texture,
                     size = { 12, 12 }
@@ -211,15 +219,15 @@ main :: proc()
             }
 
             player = Sprite{
-                center = g.nodes[0],
+                center = float(g.nodes[0]),
                 registration = { 0, 1 },
                 sheet = girl_texture,
                 size = { 26, 26 },
-                target = g.nodes[0]
+                target = float(g.nodes[0])
             }
 
             goal = Sprite{
-                center = g.nodes[3],
+                center = float(g.nodes[3]),
                 registration = { 0, 0 },
                 sheet = goal_texture,
                 size = { 24, 24 }
@@ -317,13 +325,11 @@ main :: proc()
                                 graph.declare_safe(solver, edge_id)
 
                                 last_edge_id = edge_id
+                                web_lines[edge_id].sag = 10
 
-                                if button.node_id == 3
-                                {
-                                    win = true
-                                }
+                                player.target.x = f32(g.nodes[current_node].x)
+                                player.target.y = f32(g.nodes[current_node].y)
 
-                                player.target = g.nodes[current_node]
                                 player.animation = GIRL_RUN
                                 moving = true
 
@@ -426,17 +432,23 @@ main :: proc()
 
         if moving
         {
+            player.y += line_height_delta(web_lines[last_edge_id], player.x, player.y)
+
             moving = update_position(&player)
             if !moving
             {
-                web_lines[last_edge_id].sag = 10
                 player.animation = nil
                 player.frame = 0
+
+                if current_node == 3
+                {
+                    win = true
+                }
             }
         }
         else
         {
-            if rand.float32() < 0.002 && player.animation == nil
+            if rand.float32() < 0.008 && player.animation == nil
             {
                 player.animation = GIRL_IDLE
             }

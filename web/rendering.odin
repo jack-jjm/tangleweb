@@ -17,7 +17,7 @@ Square :: struct {
 }
 
 Sprite :: struct {
-    using center : [2]i32,
+    using center : [2]f32,
     registration : [2]i32,
     hidden : bool,
     sheet : rl.Texture,
@@ -25,7 +25,7 @@ Sprite :: struct {
     frame : i32,
     animation : union { Animation },
     flip : bool,
-    target : [2]i32
+    target : [2]f32
 }
 
 GIRL_RUN := Animation{
@@ -46,7 +46,7 @@ update_position :: proc(sprite : ^Sprite) -> bool
     fvector := [2]f32{ f32(vector.x), f32(vector.y) }
     distance := math.sqrt(fvector.x * fvector.x + fvector.y * fvector.y)
 
-    step :: 3
+    step : f32 : 3
 
     if distance < step
     {
@@ -56,8 +56,8 @@ update_position :: proc(sprite : ^Sprite) -> bool
 
     fdelta := fvector / distance
 
-    sprite.center.x = i32(f32(sprite.center.x) + step * fdelta.x)
-    sprite.center.y = i32(f32(sprite.center.y) + step * fdelta.y)
+    sprite.center.x = sprite.center.x + step * fdelta.x
+    sprite.center.y = sprite.center.y + step * fdelta.y
 
     return true
 }
@@ -114,9 +114,9 @@ render_sprite :: proc(sprite : Sprite)
 {
     if sprite.hidden do return
 
-    origin := [2]i32{
-        sprite.size.x / 2 + sprite.registration[0] * sprite.size.y / 2,
-        sprite.size.y / 2 + sprite.registration[1] * sprite.size.y / 2
+    origin := [2]f32{
+        f32(sprite.size.x / 2 + sprite.registration[0] * sprite.size.y / 2),
+        f32(sprite.size.y / 2 + sprite.registration[1] * sprite.size.y / 2)
     }
 
     flip : f32 = sprite.flip ? -1 : 1
@@ -213,6 +213,31 @@ render_line :: proc(line : Line)
             previous = { x, i32(y) }
         }
     }
+}
+
+line_height_delta :: proc(line : Line, x : f32, y0 : f32) -> f32
+{
+    p1 := line.p1
+    p2 := line.p2
+
+    x1 := p1.x
+    x2 := p2.x
+    y1 := p1.y
+    y2 := p2.y
+
+    if x1 == x2 do return 0
+
+    a := f32(x1 - x2) / 2
+    a = a * a
+    a = -f32(line.sag) / a
+
+    slope := f32(y2 - y1) / f32(x2 - x1)
+
+    y := f32(y1)
+    y += (x - f32(x1)) * slope
+    y += a * (x - f32(x1)) * (x - f32(x2))
+
+    return y - y0
 }
 
 render_label :: proc(label : Label)
