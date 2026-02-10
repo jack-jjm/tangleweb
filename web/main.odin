@@ -66,6 +66,8 @@ main :: proc()
     bad_image := rl.LoadImageFromMemory(".png", raw_data(bad_sprite_data), cast(i32) len(bad_sprite_data))
     bad_texture := rl.LoadTextureFromImage(bad_image)
 
+    animation_tick := 0
+
     TIME : f32 = 60
     time : f32
     current_node : int
@@ -410,6 +412,16 @@ main :: proc()
         }
 
         player.center = g.nodes[current_node].position
+
+        //
+
+        animation_tick += 1
+        if (animation_tick*9 >= 60)
+        {
+            animation_tick = 0
+
+            update_animation(&player)
+        }
 
         rl.BeginDrawing()
 

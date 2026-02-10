@@ -2,6 +2,12 @@ package web
 
 import rl "vendor:raylib"
 
+Animation :: struct {
+    frames : []i32,
+    next : enum { Loop, Stop },
+    current : int
+}
+
 Square :: struct {
     using center : [2]i32,
     hidden : bool,
@@ -15,7 +21,39 @@ Sprite :: struct {
     hidden : bool,
     sheet : rl.Texture,
     size : [2]i32,
-    frame : i32
+    frame : i32,
+    animation : union { Animation }
+}
+
+GIRL_RUN := Animation{
+    frames = { 4, 5 },
+    next = .Loop
+}
+
+GIRL_IDLE := Animation{
+    frames = { 1, 2, 3, 3, 3, 3, 3, 3, 3, 1, 0 },
+    next = .Stop
+}
+
+update_animation :: proc(sprite : ^Sprite)
+{
+    if sprite.animation == nil do return
+    animation := &sprite.animation.(Animation)
+
+    sprite.frame = animation.frames[animation.current]
+
+    animation.current += 1
+    if animation.current == len(animation.frames)
+    {
+        switch animation.next
+        {
+            case .Loop:
+                animation.current = 0
+
+            case .Stop:
+                sprite.animation = nil
+        }
+    }
 }
 
 Line :: struct {
