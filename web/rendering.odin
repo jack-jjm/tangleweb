@@ -13,7 +13,9 @@ Sprite :: struct {
     using center : [2]i32,
     registration : [2]i32,
     hidden : bool,
-    texture : rl.Texture
+    sheet : rl.Texture,
+    size : [2]i32,
+    frame : i32
 }
 
 Line :: struct {
@@ -48,14 +50,30 @@ render_sprite :: proc(sprite : Sprite)
     if sprite.hidden do return
 
     origin := [2]i32{
-        sprite.texture.width / 2 + sprite.registration[0] * sprite.texture.width / 2,
-        sprite.texture.height / 2 + sprite.registration[1] * sprite.texture.height / 2
+        sprite.size.x / 2 + sprite.registration[0] * sprite.size.y / 2,
+        sprite.size.y / 2 + sprite.registration[1] * sprite.size.y / 2
     }
 
-    rl.DrawTexture(
-        sprite.texture,
-        sprite.x - origin.x,
-        sprite.y - origin.y,
+    source := rl.Rectangle{
+        x = f32(sprite.frame * sprite.size.x),
+        y = 0,
+        width = f32(sprite.size.x),
+        height = f32(sprite.size.y)
+    }
+
+    target := rl.Rectangle{
+        x = f32(sprite.x - origin.x),
+        y = f32(sprite.y - origin.y),
+        width  = f32(sprite.size.x),
+        height = f32(sprite.size.y)
+    }
+
+    rl.DrawTexturePro(
+        sprite.sheet,
+        source,
+        target,
+        { 0, 0 },
+        0,
         rl.WHITE
     )
 }

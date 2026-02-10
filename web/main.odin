@@ -200,7 +200,8 @@ main :: proc()
                 sprite := Sprite{
                     center = g.nodes[node_id],
                     registration = { 0, 0 },
-                    texture = bad_texture
+                    sheet = bad_texture,
+                    size = { 12, 12 }
                 }
                 append(&bad_nodes, sprite)
             }
@@ -208,13 +209,15 @@ main :: proc()
             player = Sprite{
                 center = g.nodes[0],
                 registration = { 0, 1 },
-                texture = girl_texture
+                sheet = girl_texture,
+                size = { 26, 26 }
             }
 
             goal = Sprite{
                 center = g.nodes[3],
                 registration = { 0, 0 },
-                texture = goal_texture
+                sheet = goal_texture,
+                size = { 24, 24 }
             }
 
             dead_label = Label{
