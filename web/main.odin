@@ -73,6 +73,8 @@ main :: proc()
     current_node : int
     dead : bool
     win : bool
+    moving : bool
+    last_edge_id : int
     paused : bool
 
     g : graph.Graph
@@ -212,7 +214,8 @@ main :: proc()
                 center = g.nodes[0],
                 registration = { 0, 1 },
                 sheet = girl_texture,
-                size = { 26, 26 }
+                size = { 26, 26 },
+                target = g.nodes[0]
             }
 
             goal = Sprite{
@@ -310,14 +313,24 @@ main :: proc()
                             }
                             else
                             {
-                                current_node = button.node_id                                
+                                current_node = button.node_id                          
                                 graph.declare_safe(solver, edge_id)
 
-                                web_lines[edge_id].sag = 10
+                                last_edge_id = edge_id
 
                                 if button.node_id == 3
                                 {
                                     win = true
+                                }
+
+                                player.target = g.nodes[current_node]
+                                player.animation = GIRL_RUN
+                                moving = true
+
+                                player.flip = false
+                                if player.target.x < player.center.x
+                                {
+                                    player.flip = true
                                 }
                             }
                         }
@@ -411,7 +424,23 @@ main :: proc()
             }
         }
 
-        player.center = g.nodes[current_node].position
+        if moving
+        {
+            moving = update_position(&player)
+            if !moving
+            {
+                web_lines[last_edge_id].sag = 10
+                player.animation = nil
+                player.frame = 0
+            }
+        }
+        else
+        {
+            if rand.float32() < 0.002 && player.animation == nil
+            {
+                player.animation = GIRL_IDLE
+            }
+        }
 
         //
 

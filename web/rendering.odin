@@ -1,6 +1,7 @@
 package web
 
 import rl "vendor:raylib"
+import "core:math"
 
 Animation :: struct {
     frames : []i32,
@@ -22,7 +23,9 @@ Sprite :: struct {
     sheet : rl.Texture,
     size : [2]i32,
     frame : i32,
-    animation : union { Animation }
+    animation : union { Animation },
+    flip : bool,
+    target : [2]i32
 }
 
 GIRL_RUN := Animation{
@@ -33,6 +36,30 @@ GIRL_RUN := Animation{
 GIRL_IDLE := Animation{
     frames = { 1, 2, 3, 3, 3, 3, 3, 3, 3, 1, 0 },
     next = .Stop
+}
+
+update_position :: proc(sprite : ^Sprite) -> bool
+{
+    if sprite.center == sprite.target do return false
+
+    vector := sprite.target - sprite.center
+    fvector := [2]f32{ f32(vector.x), f32(vector.y) }
+    distance := math.sqrt(fvector.x * fvector.x + fvector.y * fvector.y)
+
+    step :: 3
+
+    if distance < step
+    {
+        sprite.center = sprite.target
+        return false
+    }
+
+    fdelta := fvector / distance
+
+    sprite.center.x = i32(f32(sprite.center.x) + step * fdelta.x)
+    sprite.center.y = i32(f32(sprite.center.y) + step * fdelta.y)
+
+    return true
 }
 
 update_animation :: proc(sprite : ^Sprite)
@@ -92,10 +119,12 @@ render_sprite :: proc(sprite : Sprite)
         sprite.size.y / 2 + sprite.registration[1] * sprite.size.y / 2
     }
 
+    flip : f32 = sprite.flip ? -1 : 1
+
     source := rl.Rectangle{
         x = f32(sprite.frame * sprite.size.x),
         y = 0,
-        width = f32(sprite.size.x),
+        width = flip * f32(sprite.size.x),
         height = f32(sprite.size.y)
     }
 
