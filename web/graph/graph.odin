@@ -19,11 +19,6 @@ Edge :: struct {
     protected : bool
 }
 
-Solver :: struct {
-    graph : ^Graph,
-    edges : [dynamic]Safety
-}
-
 Face :: struct {
     edges : [dynamic]int,
     count : int,

@@ -37,15 +37,20 @@ WEB_COLOR_SAFE    : rl.Color = { 223, 229, 233, 255 }
 
 FACE_LABEL_COLOR := WEB_COLOR_SAFE
 
+format :: proc(fstring : string, args : ..any) -> cstring
+{
+    text := fmt.aprintf(fstring, ..args, allocator=context.temp_allocator)
+    return strings.clone_to_cstring(text, context.temp_allocator)
+}
+
 main :: proc()
 {
     seed := rand.uint64()
     rand.reset(seed)
     fmt.println("seed:", seed)
 
-    // rand.reset(2818313247485133324)
-
-    // 600x300
+    // difficult 10697038158871979521
+    // rand.reset(14590908374776623767)
 
     rl.SetTraceLogLevel(rl.TraceLogLevel.WARNING)
     rl.InitWindow(1200 + 100, 600 + 100, "web")
@@ -66,6 +71,7 @@ main :: proc()
     current_node : int
     dead : bool
     win : bool
+    paused : bool
 
     g : graph.Graph
     solver : graph.Solver
@@ -102,6 +108,11 @@ main :: proc()
 
         //
 
+        if !paused
+        {
+            time += 1 / 60.
+        }
+
         if rl.IsKeyPressed(rl.KeyboardKey.N)
         {
             graph.destroy(&g)
@@ -123,6 +134,7 @@ main :: proc()
             current_node = 0
             dead = false
             win = false
+            paused = false
 
             g = graph.Graph{ x = 15, y = 10, width = 600 - 30, height = 300 - 20 }
             graph.generate_graph(&g)    
@@ -250,21 +262,24 @@ main :: proc()
             }
         }
 
+        if rl.IsKeyPressed(rl.KeyboardKey.T)
+        {
+            paused = true
+        }
+
         time_left := TIME - time
-
-        {
-            text := fmt.aprintf("%02d", i32(time_left), allocator=context.temp_allocator)
-            seconds_label.text = strings.clone_to_cstring(text, context.temp_allocator)
-        }
-
-        {
-            text := fmt.aprintf("%.2f", time_left - f32(i32(time_left)), allocator=context.temp_allocator)
-            centiseconds_label.text = strings.clone_to_cstring(text[2:], context.temp_allocator)
-        }
+        seconds_label.text = format("%02d", int(time_left))
+        centiseconds_label.text = format("%02d", int(time_left * 100) % 100)
 
         if time_left <= 0 && !win
         {
             dead = true
+        }
+        else if time_left <= 10
+        {
+            seconds_label.color = rl.RED
+            centiseconds_label.color = rl.RED
+            timer_decimal_point.color = rl.RED
         }
 
         if !dead && !win
@@ -445,8 +460,6 @@ main :: proc()
         )
 
         rl.EndDrawing()
-    
-        time += 1 / 60.
 
         free_all(context.temp_allocator)
     }

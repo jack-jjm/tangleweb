@@ -1,5 +1,13 @@
 package graph
 
+Solver :: struct {
+    graph : ^Graph,
+    edges : []Safety,
+    nodes : []Safety,
+}
+
+SolverResult :: enum { SOLVABLE, IMPOSSIBLE }
+
 reset_solver :: proc(solver : Solver)
 {
     for _, i in solver.edges
@@ -12,7 +20,8 @@ init_solver :: proc(graph : ^Graph) -> Solver
 {
     solver : Solver
 
-    solver.edges = make([dynamic]Safety, len(graph.edges))
+    solver.edges = make([]Safety, len(graph.edges))
+    solver.nodes = make([]Safety, len(graph.nodes))
     solver.graph = graph
 
     iterator := Neighbors{ graph=graph^, source=0 }
@@ -49,4 +58,9 @@ declare_safe :: proc(solver : Solver, safe_edge_id : int)
             }
         }
     }
+}
+
+solve :: proc(solver : Solver) -> SolverResult
+{
+    return .SOLVABLE
 }
