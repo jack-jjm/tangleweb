@@ -38,6 +38,11 @@ GIRL_IDLE := Animation{
     next = .Stop
 }
 
+GIRL_DIE := Animation{
+    frames = { 6, 7, 7, 7, 8, 9, 10 },
+    next = .Stop
+}
+
 update_position :: proc(sprite : ^Sprite) -> bool
 {
     if sprite.center == sprite.target do return false
