@@ -22,6 +22,11 @@ update_dead :: proc(state : ^Dead) -> union{State}
     check_default_keys() or_return
 
     animation, ok := player.animation.(Animation)
+    if ok && animation.current == 3
+    {
+        rl.PlaySound(res.sounds.spider_attack)
+    }
+
     if ok && animation.current == 5
     {
         rl.PlaySound(res.sounds.scream)
@@ -30,6 +35,9 @@ update_dead :: proc(state : ^Dead) -> union{State}
     // if player animation is done, display game over screen
     if player.animation == nil
     {
+        rl.StopMusicStream(res.sounds.heart_fast)
+        rl.StopMusicStream(res.sounds.heart_slow)
+
         color := rl.RED
         dead_label.hidden = false
 

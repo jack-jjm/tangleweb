@@ -3,7 +3,6 @@ package web
 import rl "vendor:raylib"
 import "core:fmt"
 import "core:strings"
-import "core:math"
 import "core:math/rand"
 
 import "graph"
@@ -26,7 +25,8 @@ Playing :: struct {
 
 Moving :: struct {
     start_id, end_id, edge_id : int,
-    distance, distance_moved : f32
+    distance, distance_moved : f32,
+    playing_sound : bool
 }
 
 Dead :: struct {}
@@ -100,6 +100,25 @@ update_timer :: proc() -> union{State}
     seconds_label.text = format("%02d", int(time_left))
     centiseconds_label.text = format("%02d", int(time_left * 100) % 100)
 
+    if time_left <= 20
+    {
+        if heart_rate == 0
+        {
+            rl.PlayMusicStream(res.sounds.heart_slow)
+            heart_rate = 1
+        }
+    }
+
+    if time_left <= 10
+    {
+        if heart_rate == 1
+        {
+            rl.StopMusicStream(res.sounds.heart_slow)
+            rl.PlayMusicStream(res.sounds.heart_fast)
+            heart_rate = 2
+        }
+    }
+
     if time_left <= 10
     {
         seconds_label.color = rl.RED
@@ -119,6 +138,7 @@ TIME : f32 = 60
 time : f32
 current_node : int
 paused : bool
+heart_rate : int
 requires_initialization := true
 g : graph.Graph
 solver : graph.Solver
@@ -183,8 +203,15 @@ main :: proc()
 
     substate = nil
 
+    ambiance := rl.LoadMusicStream("graphics/ambiance.mp3")
+    rl.PlayMusicStream(ambiance)    
+
     for !rl.WindowShouldClose()
     {
+        rl.UpdateMusicStream(ambiance)
+        rl.UpdateMusicStream(res.sounds.heart_slow)
+        rl.UpdateMusicStream(res.sounds.heart_fast)
+
         window.step()
 
         show_path := false

@@ -2,9 +2,12 @@ package web
 
 import rl "vendor:raylib"
 
+import res "resources"
+
 init_won :: proc(state : ^Won)
 {
-    
+    rl.StopMusicStream(res.sounds.heart_fast)
+    rl.StopMusicStream(res.sounds.heart_slow)
 }
 
 update_won :: proc(state : ^Won) -> union{State}

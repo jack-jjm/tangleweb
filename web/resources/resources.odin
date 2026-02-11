@@ -13,7 +13,12 @@ sheets : struct {
 }
 
 sounds : struct {
-    scream : rl.Sound
+    scream : rl.Sound,
+    spider : [4]rl.Sound,
+    spider_attack : rl.Sound,
+    spider_approach : rl.Sound,
+    heart_slow : rl.Music,
+    heart_fast : rl.Music
 }
 
 init :: proc()
@@ -27,4 +32,15 @@ init :: proc()
     sheets.bad  = rl.LoadTextureFromImage(bad_image)
 
     sounds.scream = rl.LoadSound("graphics/scream.wav")
+    
+    sounds.spider[0] = rl.LoadSound("graphics/spider1.wav")
+    sounds.spider[1] = rl.LoadSound("graphics/spider2.wav")
+    sounds.spider[2] = rl.LoadSound("graphics/spider3.wav")
+    sounds.spider[3] = rl.LoadSound("graphics/spider4.wav")
+    
+    sounds.spider_attack = rl.LoadSound("graphics/spiderattack.wav")
+    sounds.spider_approach = rl.LoadSound("graphics/spiderapproach.wav")
+
+    sounds.heart_slow = rl.LoadMusicStream("graphics/heartslow.ogg")
+    sounds.heart_fast = rl.LoadMusicStream("graphics/heartfast.mp3")
 }

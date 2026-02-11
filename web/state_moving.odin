@@ -1,7 +1,11 @@
 package web
 
+import rl "vendor:raylib"
+
 import "core:math"
+import "core:math/rand"
 import "graph"
+import res "resources"
 
 init_moving :: proc(state : ^Moving)
 {
@@ -89,6 +93,14 @@ update_moving :: proc(state : ^Moving) -> union{State}
         if g.edges[state.edge_id].lethal
         {
             return Dead{}
+        }
+    }
+    else if progress >= 0.25 && !state.playing_sound
+    {
+        if g.edges[state.edge_id].lethal || rand.float32() < 0.01
+        {
+            rl.PlaySound(res.sounds.spider_approach)
+            state.playing_sound = true
         }
     }
 

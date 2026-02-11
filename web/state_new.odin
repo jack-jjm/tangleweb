@@ -12,6 +12,7 @@ init_new :: proc(state : ^New)
     time = 0
     current_node = 0
     paused = false
+    heart_rate = 0
 
     g = graph.Graph{ x = 15, y = 10, width = 600 - 30, height = 300 - 20 }
     graph.generate_graph(&g)    
@@ -105,10 +106,10 @@ init_new :: proc(state : ^New)
             i32(300),
             i32(150),
         },
-        text = "DEAD",
+        text = "PRESS N TO RETRY",
         color = rl.RED,
         hidden = true,
-        font_height = 200
+        font_height = 40
     }
 
     win_label = Label{

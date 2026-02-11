@@ -4,6 +4,7 @@ import "core:math/rand"
 import rl "vendor:raylib"
 
 import "graph"
+import res "resources"
 
 init_playing :: proc(state : ^Playing)
 {
@@ -30,6 +31,7 @@ update_playing :: proc(state : ^Playing) -> union{State}
     }
     else if rand.float32() < 0.005
     {
+        rl.PlaySound(res.sounds.spider[rand.int31() % len(res.sounds.spider)])
         player.animation = GIRL_IDLE
         state.counter = 0
     }
