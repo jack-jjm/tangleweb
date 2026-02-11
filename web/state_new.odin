@@ -98,7 +98,7 @@ init_new :: proc(state : ^New)
         center = float(g.nodes[3]),
         registration = { 0, 0 },
         sheet = res.sheets.goal,
-        size = { 24, 24 }
+        size = { 32, 64 }
     }
 
     dead_label = Label{
